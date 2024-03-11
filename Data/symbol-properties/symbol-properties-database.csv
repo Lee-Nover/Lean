@@ -8840,3 +8840,8 @@ bybit,ZKUSDT,cryptofuture,ZKUSDT,USDT,1,0.00001,0.1,ZKUSDT,0.1
 bybit,ZRCUSDT,cryptofuture,ZRCUSDT,USDT,1,0.00001,1,ZRCUSDT,1
 bybit,ZROUSDT,cryptofuture,ZROUSDT,USDT,1,0.0001,0.1,ZROUSDT,0.1
 bybit,ZRXUSDT,cryptofuture,ZRXUSDT,USDT,1,0.0001,1,ZRXUSDT,1
+
+#market,symbol,type,description,quote_currency,contract_multiplier,minimum_price_variation,lot_size,market_ticker,minimum_order_size,price_magnifier
+pulsechain,DAIUSD,crypto,Dai-US Dollar,USD,1,0.0001,0.00001,DAI-USD
+pulsechain,WPLSDAI,crypto,PLS DAI,DAI,1,0.0000001,1,WPLS-DAI
+pulsechain,PDAIWPLS,crypto,pDAI PLS,WPLS,1,0.0000001,0.00001,PDAI-WPLS
