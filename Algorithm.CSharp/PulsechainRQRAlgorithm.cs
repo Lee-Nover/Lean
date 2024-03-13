@@ -44,53 +44,56 @@
     using QCAlgorithmFrameworkBridge = QuantConnect.Algorithm.QCAlgorithm;
 using System.Xml;
 using QLNet;
+using QuantConnect.Securities.CurrencyConversion;
 #endregion
 namespace QuantConnect.Algorithm.CSharp
 {
     public class PulsechainRQRAlgorithm : QCAlgorithm
     {
+        private Crypto crypto;
         private Symbol symbol;
         private RationalQuadraticRegression rqr;
         private bool wasBullish;
         private bool wasBearish;
 
-        const string MAIN = "WPLS";
-        const string OTHER = "PDAI";
+        const string MAIN = "USD";
+        const string OTHER = "WPLS";
         const string PAIR = OTHER + MAIN;
-        const decimal MAIN_RESERVE = 10000m;
+        const decimal MAIN_RESERVE = 10m;
         const decimal OTHER_RESERVE = 0m;
         public override void Initialize()
         {
             // Locally Lean installs free sample data, to download more data please visit https://www.quantconnect.com/docs/v2/lean-cli/datasets/downloading-data
             // 20180405_trade
             
-            SetStartDate(2024, 03, 08);
-            SetEndDate(2024, 03, 12);
-            SetAccountCurrency(MAIN, 3000000m);
-            SetCash(OTHER, 130000m);
-            QuantConnect.Market.Add("pulsechain", 369);
-            symbol = AddCrypto(PAIR, Resolution.Minute, "pulsechain").Symbol;
+            SetStartDate(2024, 02, 02);
+            SetEndDate(2024, 03, 14);
             
-            EnableAutomaticIndicatorWarmUp = true;
+            
+            SetAccountCurrency(MAIN);
+            Market.Add("pulsechain", 369);
+            crypto = AddCrypto(PAIR, Resolution.Hour, "pulsechain");
+            symbol = crypto.Symbol;
+            
+            SetCash(MAIN, 2000m);
+            SetCash(OTHER, 1000000m);
+
             rqr = new RationalQuadraticRegression(10, 10, 1);
             string name = CreateIndicatorName(symbol, rqr.Name, null);
             RegisterIndicator(symbol, rqr, null);
-            if (EnableAutomaticIndicatorWarmUp)
-            {
-                WarmUpIndicator(symbol, rqr, null);
-            }
-            SetWarmUp(10 * 5);
+            SetWarmUp(10);
             
-            var chart = new Chart("Price");
+            /*var chart = new Chart("Price");
             AddChart(chart);
             chart.AddSeries(new Series(rqr.Name, SeriesType.Line, "$", Color.Orange));
-            chart.AddSeries(new CandlestickSeries(OTHER, OTHER));
+            chart.AddSeries(new CandlestickSeries(OTHER, OTHER));*/
 
-            Consolidate(symbol, TimeSpan.FromMinutes(5), OnDataConsolidated);
+            //Consolidate(symbol, TimeSpan.FromMinutes(5), OnDataConsolidated);
         }
 
         private void OnDataConsolidated(TradeBar bar)
         {
+            return;
             rqr.Update(Time, bar.Close);
             if (!rqr.IsReady) return;
             
@@ -122,7 +125,29 @@ namespace QuantConnect.Algorithm.CSharp
         /// Slice object keyed by symbol containing the stock data
         public override void OnData(Slice data)
         {
-            
+            if (IsWarmingUp) return;
+            var price = crypto.Price;// Securities[PAIR].Price;
+            var isBullish = rqr[0].Value > rqr[1].Value;
+            var isBearish = rqr[0].Value < rqr[1].Value;
+            if (isBullish && !wasBullish && !Portfolio.Invested)
+            {
+                var maxMain = Portfolio.CashBook[MAIN].Amount - MAIN_RESERVE;
+                var other = maxMain / price;
+                if (other > 0)
+                {
+                    Log($"{Time}   Buying {other:F5} {OTHER} for {MAIN} {maxMain:F5}");
+                    Buy(PAIR, other);
+                }
+            } else if (isBearish && !wasBearish && Portfolio.Invested) {
+                var maxOther = Portfolio.CashBook[OTHER].Amount - OTHER_RESERVE;
+                if (maxOther > 0)
+                {
+                    Log($"{Time}   Selling {maxOther:F5} {OTHER} for {MAIN} {maxOther * price:F5}");
+                    Sell(PAIR, maxOther);
+                }
+            }
+            wasBullish = isBullish;
+            wasBearish = isBearish;
         }
 
         public override void OnEndOfDay(Symbol symbol)
