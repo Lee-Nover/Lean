@@ -54,9 +54,10 @@ namespace QuantConnect.Util
         /// <param name="pastEndLine">True if end line was past, useful for consumers to know a line ended</param>
         /// <returns>The decimal read from the stream</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static decimal GetDecimal64bit(this StreamReader stream, out bool pastEndLine, char delimiter = DefaultDelimiter)
+        public static decimal GetDecimal(this StreamReader stream, out bool pastEndLine, char delimiter = DefaultDelimiter)
         {
             long value = 0;
+            long valueHi = 0;
             var decimalPlaces = NoDecimalPlaces;
             var current = (char)stream.Read();
 
@@ -78,10 +79,14 @@ namespace QuantConnect.Util
                 {
                     decimalPlaces = 0;
                 }
-                else
+                else if ('0' <= current && current <= '9')
                 {
-                    value = value * 10 + (current - '0');
-                    if (decimalPlaces != NoDecimalPlaces)
+                    var digit = current - '0';
+                    value = value * 10 + digit;
+                    valueHi = valueHi * 10 + (value >> 32);
+                    value &= 0xFFFFFFFF;
+                    
+                    if(decimalPlaces != NoDecimalPlaces)
                     {
                         decimalPlaces++;
                     }
@@ -91,47 +96,9 @@ namespace QuantConnect.Util
             }
 
             var lo = (int)value;
-            var mid = (int)(value >> 32);
-            return new decimal(lo, mid, 0, isNegative, (byte)(decimalPlaces != NoDecimalPlaces ? decimalPlaces : 0));
-        }
-        
-        /// <summary>
-        /// Gets a decimal from the provided stream reader
-        /// </summary>
-        /// <param name="stream">The data stream</param>
-        /// <param name="delimiter">The data delimiter character to use, default is ','</param>
-        /// <param name="pastEndLine">True if end line was past, useful for consumers to know a line ended</param>
-        /// <returns>The decimal read from the stream</returns>
-        public static decimal GetDecimal(this StreamReader stream, out bool pastEndLine, char delimiter = DefaultDelimiter)
-        {
-            var index = 0;
-            var data = new char[32];
-            var current = (char)stream.Read();
-
-            while (current == ' ')
-            {
-                current = (char)stream.Read();
-            }
-
-            var isNegative = current == '-';
-            if (isNegative)
-            {
-                current = (char)stream.Read();
-            }
-
-            
-            pastEndLine = current == '\n' || current == '\r' && (stream.Peek() != '\n' || stream.Read() == '\n') || current == NoMoreData;
-            while (!(current == delimiter || pastEndLine || current == ' '))
-            {
-                data[index++] = current;
-                current = (char)stream.Read();
-                pastEndLine = current == '\n' || current == '\r' && (stream.Peek() != '\n' || stream.Read() == '\n') || current == NoMoreData;
-            }
-
-            if (decimal.TryParse(data, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value))
-                return value;
-            else
-                return 0m;
+            var mid = (int)(valueHi & 0xFFFFFFFF);
+            var hi = (int)(valueHi >> 32);
+            return new decimal(lo, mid, hi, isNegative, (byte)(decimalPlaces != NoDecimalPlaces ? decimalPlaces : 0));
         }
 
         /// <summary>
