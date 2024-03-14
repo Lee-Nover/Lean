@@ -56,10 +56,10 @@ namespace QuantConnect.Algorithm.CSharp
         private bool wasBullish;
         private bool wasBearish;
 
-        const string MAIN = "USD";
-        const string OTHER = "WPLS";
+        const string MAIN = "WPLS";
+        const string OTHER = "PDAI";
         const string PAIR = OTHER + MAIN;
-        const decimal MAIN_RESERVE = 10m;
+        const decimal MAIN_RESERVE = 100000m;
         const decimal OTHER_RESERVE = 0m;
         public override void Initialize()
         {
@@ -69,15 +69,15 @@ namespace QuantConnect.Algorithm.CSharp
             SetStartDate(2024, 02, 02);
             SetEndDate(2024, 03, 14);
             
+            SetBrokerageModel(BrokerageName.Default, AccountType.Cash);
             
             SetAccountCurrency(MAIN);
             Market.Add("pulsechain", 369);
             crypto = AddCrypto(PAIR, Resolution.Hour, "pulsechain");
             symbol = crypto.Symbol;
+            SetCash(MAIN, 2000000m);
+            SetCash(OTHER, 100000m);
             
-            SetCash(MAIN, 2000m);
-            SetCash(OTHER, 1000000m);
-
             rqr = new RationalQuadraticRegression(10, 10, 1);
             string name = CreateIndicatorName(symbol, rqr.Name, null);
             RegisterIndicator(symbol, rqr, null);
@@ -129,7 +129,9 @@ namespace QuantConnect.Algorithm.CSharp
             var price = crypto.Price;// Securities[PAIR].Price;
             var isBullish = rqr[0].Value > rqr[1].Value;
             var isBearish = rqr[0].Value < rqr[1].Value;
-            if (isBullish && !wasBullish && !Portfolio.Invested)
+            var canBuy = Portfolio.CashBook[MAIN].Amount > MAIN_RESERVE;
+            var canSell = Portfolio.CashBook[OTHER].Amount > OTHER_RESERVE;
+            if (isBullish && !wasBullish && canBuy)
             {
                 var maxMain = Portfolio.CashBook[MAIN].Amount - MAIN_RESERVE;
                 var other = maxMain / price;
@@ -138,7 +140,7 @@ namespace QuantConnect.Algorithm.CSharp
                     Log($"{Time}   Buying {other:F5} {OTHER} for {MAIN} {maxMain:F5}");
                     Buy(PAIR, other);
                 }
-            } else if (isBearish && !wasBearish && Portfolio.Invested) {
+            } else if (isBearish && !wasBearish && canSell) {
                 var maxOther = Portfolio.CashBook[OTHER].Amount - OTHER_RESERVE;
                 if (maxOther > 0)
                 {
