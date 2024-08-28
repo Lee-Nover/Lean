@@ -19,7 +19,6 @@ using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
-using QuantConnect.Securities;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -70,7 +69,10 @@ namespace QuantConnect.Algorithm.CSharp
                     }
                 }
 
-                if (!hasHistory) throw new Exception($"No {symbol} data on the eve of {Time} {Time.DayOfWeek}");
+                if (!hasHistory)
+                {
+                    throw new RegressionTestException($"No {symbol} data on the eve of {Time} {Time.DayOfWeek}");
+                }
             }
         }
 
@@ -78,7 +80,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (_received.Count != _symbols.Length)
             {
-                throw new Exception($"Data for symbols {string.Join(",", _symbols.Except(_received))} were not received");
+                throw new RegressionTestException($"Data for symbols {string.Join(",", _symbols.Except(_received))} were not received");
             }
         }
 
@@ -91,7 +93,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -101,7 +103,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of the algorithm history
         /// </summary>
-        public int AlgorithmHistoryDataPoints => 42660;
+        public int AlgorithmHistoryDataPoints => 43089;
+
+        /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
@@ -114,6 +121,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000.00"},
+            {"End Equity", "100000"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
             {"Sortino Ratio", "0"},

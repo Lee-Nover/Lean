@@ -14,13 +14,15 @@
 */
 
 using System;
+using System.Runtime.CompilerServices;
 using MathNet.Numerics.Distributions;
+using QuantConnect.Logging;
 using QuantConnect.Util;
 
 namespace QuantConnect.Indicators
 {
     /// <summary>
-    /// Helper clas for option greeks related indicators
+    /// Helper class for option greeks related indicators
     /// </summary>
     public class OptionGreekIndicatorsHelper
     {
@@ -28,7 +30,10 @@ namespace QuantConnect.Indicators
         /// Number of steps in binomial tree simulation to obtain Greeks/IV
         /// </summary>
         public const int Steps = 200;
-     
+
+        /// <summary>
+        /// Returns the Black theoretical price for the given arguments
+        /// </summary>
         public static decimal BlackTheoreticalPrice(decimal volatility, decimal spotPrice, decimal strikePrice, decimal timeToExpiration, decimal riskFreeRate, decimal dividendYield, OptionRight optionType)
         {
             var d1 = CalculateD1(spotPrice, strikePrice, timeToExpiration, riskFreeRate, dividendYield, volatility);
@@ -58,7 +63,7 @@ namespace QuantConnect.Indicators
         internal static decimal CalculateD1(decimal spotPrice, decimal strikePrice, decimal timeToExpiration, decimal riskFreeRate, decimal dividendYield, decimal volatility)
         {
             var numerator = DecimalMath(Math.Log, spotPrice / strikePrice) + (riskFreeRate - dividendYield + 0.5m * volatility * volatility) * timeToExpiration;
-            var denominator = volatility * DecimalMath(Math.Sqrt, timeToExpiration);
+            var denominator = volatility * DecimalMath(Math.Sqrt, Math.Max(0m, timeToExpiration));
             if (denominator == 0m)
             {
                 // return a random variable large enough to produce normal probability density close to 1
@@ -69,10 +74,13 @@ namespace QuantConnect.Indicators
 
         internal static decimal CalculateD2(decimal d1, decimal volatility, decimal timeToExpiration)
         {
-            return d1 - volatility * DecimalMath(Math.Sqrt, timeToExpiration);
+            return d1 - volatility * DecimalMath(Math.Sqrt, Math.Max(0m, timeToExpiration));
         }
 
-        // Reference: https://en.wikipedia.org/wiki/Binomial_options_pricing_model#Step_1:_Create_the_binomial_price_tree
+        /// <summary>
+        /// Creates a Binomial Theoretical Price Tree from the given parameters
+        /// </summary>
+        /// <remarks>Reference: https://en.wikipedia.org/wiki/Binomial_options_pricing_model#Step_1:_Create_the_binomial_price_tree</remarks>
         public static decimal CRRTheoreticalPrice(decimal volatility, decimal spotPrice, decimal strikePrice,
             decimal timeToExpiration, decimal riskFreeRate, decimal dividendYield, OptionRight optionType, int steps = Steps)
         {
@@ -89,13 +97,17 @@ namespace QuantConnect.Indicators
             return BinomialTheoreticalPrice(deltaTime, probUp, upFactor, riskFreeRate, spotPrice, strikePrice, optionType, steps);
         }
 
+        /// <summary>
+        /// Creates the Forward Binomial Theoretical Price Tree from the given parameters
+        /// </summary>
         public static decimal ForwardTreeTheoreticalPrice(decimal volatility, decimal spotPrice, decimal strikePrice,
             decimal timeToExpiration, decimal riskFreeRate, decimal dividendYield, OptionRight optionType, int steps = Steps)
         {
             var deltaTime = timeToExpiration / steps;
             var discount = DecimalMath(Math.Exp, (riskFreeRate - dividendYield) * deltaTime);
-            var upFactor = DecimalMath(Math.Exp, volatility * DecimalMath(Math.Sqrt, deltaTime)) * discount;
-            var downFactor = DecimalMath(Math.Exp, -volatility * DecimalMath(Math.Sqrt, deltaTime)) * discount;
+            var volatilityTimeSqrtDeltaTime = volatility * DecimalMath(Math.Sqrt, deltaTime);
+            var upFactor = DecimalMath(Math.Exp, volatilityTimeSqrtDeltaTime) * discount;
+            var downFactor = DecimalMath(Math.Exp, -volatilityTimeSqrtDeltaTime) * discount;
             if (upFactor - downFactor == 0m)
             {
                 // Introduce a very small factor
@@ -120,11 +132,12 @@ namespace QuantConnect.Indicators
                 values[i] = OptionPayoff.GetIntrinsicValue(nextPrice, strikePrice, optionType);
             }
 
+            var factor = DecimalMath(Math.Exp, -riskFreeRate * deltaTime);
             for (int period = steps - 1; period >= 0; period--)
             {
                 for (int i = 0; i <= period; i++)
                 {
-                    var binomialValue = DecimalMath(Math.Exp, -riskFreeRate * deltaTime) * (values[i] * probDown + values[i + 1] * probUp);
+                    var binomialValue = factor * (values[i] * probDown + values[i + 1] * probUp);
                     // No advantage for American put option to exercise early in risk-neutral setting
                     if (optionType == OptionRight.Put)
                     {
@@ -140,9 +153,22 @@ namespace QuantConnect.Indicators
             return values[0];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static decimal DecimalMath(Func<double, double> function, decimal input)
         {
             return Convert.ToDecimal(function((double)input));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static decimal Divide(decimal numerator, decimal denominator)
+        {
+            if (denominator != 0)
+            {
+                return numerator / denominator;
+            }
+
+            Log.Error("OptionGreekIndicatorsHelper.Divide(): Division by zero detected. Returning 0.");
+            return 0;
         }
     }
 }

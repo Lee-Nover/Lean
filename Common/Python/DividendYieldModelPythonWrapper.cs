@@ -22,17 +22,15 @@ namespace QuantConnect.Python
     /// <summary>
     /// Wraps a <see cref="PyObject"/> object that represents a dividend yield model
     /// </summary>
-    public class DividendYieldModelPythonWrapper : IDividendYieldModel
+    public class DividendYieldModelPythonWrapper : BasePythonWrapper<IDividendYieldModel>, IDividendYieldModel
     {
-        private readonly dynamic _model;
-
         /// <summary>
         /// Constructor for initializing the <see cref="DividendYieldModelPythonWrapper"/> class with wrapped <see cref="PyObject"/> object
         /// </summary>
         /// <param name="model">Represents a security's model of dividend yield</param>
         public DividendYieldModelPythonWrapper(PyObject model)
+            : base(model)
         {
-            _model = model.ValidateImplementationOf<IDividendYieldModel>();
         }
 
         /// <summary>
@@ -42,8 +40,19 @@ namespace QuantConnect.Python
         /// <returns>Dividend yield on the given date of the given symbol</returns>
         public decimal GetDividendYield(DateTime date)
         {
-            using var _ = Py.GIL();
-            return (_model.GetDividendYield(date) as PyObject).GetAndDispose<decimal>();
+            return InvokeMethod<decimal>(nameof(GetDividendYield), date);
+        }
+
+        /// <summary>
+        /// Get dividend yield at given date and security price
+        /// </summary>
+        /// <param name="date">The date</param>
+        /// <param name="securityPrice">The security price at the given date</param>
+        /// <returns>Dividend yield on the given date of the given symbol</returns>
+        /// <remarks>Price data must be raw (<see cref="DataNormalizationMode.Raw"/>)</remarks>
+        public decimal GetDividendYield(DateTime date, decimal securityPrice)
+        {
+            return InvokeMethod<decimal>(nameof(GetDividendYield), date, securityPrice);
         }
 
         /// <summary>

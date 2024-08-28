@@ -37,7 +37,7 @@ namespace QuantConnect.Algorithm.CSharp
             var consolidatorCount = SubscriptionManager.Subscriptions.Sum(s => s.Consolidators.Count);
             if (consolidatorCount > 0)
             {
-                throw new Exception($"The number of consolidators should be zero. Actual: {consolidatorCount}");
+                throw new RegressionTestException($"The number of consolidators should be zero. Actual: {consolidatorCount}");
             }
         }
 
@@ -46,35 +46,42 @@ namespace QuantConnect.Algorithm.CSharp
         public override int AlgorithmHistoryDataPoints => 56;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public override Dictionary<string, string> ExpectedStatistics => new()
         {
-            {"Total Orders", "25"},
-            {"Average Win", "0.13%"},
+            {"Total Orders", "28"},
+            {"Average Win", "0.14%"},
             {"Average Loss", "-0.08%"},
-            {"Compounding Annual Return", "4.402%"},
+            {"Compounding Annual Return", "0.234%"},
             {"Drawdown", "1.900%"},
-            {"Expectancy", "0.558"},
-            {"Net Profit", "0.355%"},
-            {"Sharpe Ratio", "0.52"},
-            {"Sortino Ratio", "0.643"},
-            {"Probabilistic Sharpe Ratio", "45.576%"},
-            {"Loss Rate", "42%"},
-            {"Win Rate", "58%"},
-            {"Profit-Loss Ratio", "1.67"},
-            {"Alpha", "0.094"},
-            {"Beta", "-0.36"},
+            {"Expectancy", "0.186"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100019.20"},
+            {"Net Profit", "0.019%"},
+            {"Sharpe Ratio", "-0.1"},
+            {"Sortino Ratio", "-0.126"},
+            {"Probabilistic Sharpe Ratio", "37.678%"},
+            {"Loss Rate", "57%"},
+            {"Win Rate", "43%"},
+            {"Profit-Loss Ratio", "1.77"},
+            {"Alpha", "0.059"},
+            {"Beta", "-0.335"},
             {"Annual Standard Deviation", "0.048"},
             {"Annual Variance", "0.002"},
-            {"Information Ratio", "-2.095"},
-            {"Tracking Error", "0.079"},
-            {"Treynor Ratio", "-0.069"},
-            {"Total Fees", "$59.39"},
-            {"Estimated Strategy Capacity", "$38000000.00"},
+            {"Information Ratio", "-2.498"},
+            {"Tracking Error", "0.078"},
+            {"Treynor Ratio", "0.014"},
+            {"Total Fees", "$62.12"},
+            {"Estimated Strategy Capacity", "$30000000.00"},
             {"Lowest Capacity Asset", "NB R735QTJ8XC9X"},
-            {"Portfolio Turnover", "14.59%"},
-            {"OrderListHash", "8a1198fa0723754413e848b98902cc46"}
+            {"Portfolio Turnover", "14.67%"},
+            {"OrderListHash", "3b73135c5883e22b5a0d3902699cc732"}
         };
     }
 }

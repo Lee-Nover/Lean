@@ -78,7 +78,7 @@ namespace QuantConnect.Algorithm.CSharp
             positionGroup = Portfolio.Positions.Groups.Single();
             if (positionGroup.Positions.Single().Quantity != quantity)
             {
-                throw new Exception($@"Expected position group quantity to be {quantity} but was {positionGroup.Quantity}");
+                throw new RegressionTestException($@"Expected position group quantity to be {quantity} but was {positionGroup.Quantity}");
             }
 
             TestQuantityForDeltaBuyingPowerForPositionGroup(positionGroup, security);
@@ -124,7 +124,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (positionQuantityForDeltaWithPositionGroupBuyingPowerModel != expectedQuantity)
             {
-                throw new Exception($@"Expected position quantity for delta buying power to be {expectedQuantity} but was {
+                throw new RegressionTestException($@"Expected position quantity for delta buying power to be {expectedQuantity} but was {
                     positionQuantityForDeltaWithPositionGroupBuyingPowerModel}");
             }
 
@@ -144,7 +144,7 @@ namespace QuantConnect.Algorithm.CSharp
             if (positionQuantityForDeltaWithSecurityPositionGroupBuyingPowerModel != expectedSingleSecurityModelsQuantity ||
                 positionQuantityForDeltaWithSecurityBuyingPowerModel != expectedSingleSecurityModelsQuantity)
             {
-                throw new Exception($@"Expected order quantity for delta buying power calls from default buying power models to return {
+                throw new RegressionTestException($@"Expected order quantity for delta buying power calls from default buying power models to return {
                     expectedSingleSecurityModelsQuantity}. Results were:" +
                     $"    \nSecurityPositionGroupBuyingPowerModel: {positionQuantityForDeltaWithSecurityPositionGroupBuyingPowerModel}" +
                     $"    \nBuyingPowerModel: {positionQuantityForDeltaWithSecurityBuyingPowerModel}\n");
@@ -159,7 +159,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -172,6 +172,11 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
@@ -182,6 +187,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Compounding Annual Return", "-2.907%"},
             {"Drawdown", "0.300%"},
             {"Expectancy", "-1"},
+            {"Start Equity", "1000000"},
+            {"End Equity", "999380.5"},
             {"Net Profit", "-0.062%"},
             {"Sharpe Ratio", "-8.624"},
             {"Sortino Ratio", "0"},
@@ -200,7 +207,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$49000.00"},
             {"Lowest Capacity Asset", "GOOCV W78ZFMML01JA|GOOCV VP83T1ZUHROL"},
             {"Portfolio Turnover", "0.45%"},
-            {"OrderListHash", "e82f8acb4d04b142b40571c7cbc736cb"}
+            {"OrderListHash", "5d2df7cb88dbc63da13518c0195eea60"}
         };
     }
 }

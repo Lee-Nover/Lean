@@ -42,17 +42,17 @@ namespace QuantConnect.Algorithm.CSharp
 
         private DateTime lastTradeTradeBars;
         private TimeSpan tradeEvery = TimeSpan.FromMinutes(1);
-        public override void OnData(Slice data)
+        public override void OnData(Slice slice)
         {
             if (Time - lastTradeTradeBars < tradeEvery) return;
             lastTradeTradeBars = Time;
 
-            foreach (var kvp in data.Bars)
+            foreach (var kvp in slice.Bars)
             {
                 var symbol = kvp.Key;
                 var bar = kvp.Value;
 
-                if (bar.Time.RoundDown(bar.Period) != bar.Time)
+                if (bar.IsFillForward)
                 {
                     // only trade on new data
                     continue;
@@ -78,12 +78,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 16896626;
+        public long DataPoints => 16896623;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -91,35 +91,42 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Orders", "1592"},
+            {"Total Orders", "583"},
             {"Average Win", "0.00%"},
             {"Average Loss", "0.00%"},
-            {"Compounding Annual Return", "-1.257%"},
+            {"Compounding Annual Return", "-0.451%"},
             {"Drawdown", "0.000%"},
-            {"Expectancy", "-0.989"},
-            {"Net Profit", "-0.016%"},
-            {"Sharpe Ratio", "-18.139"},
-            {"Sortino Ratio", "-18.139"},
-            {"Probabilistic Sharpe Ratio", "0.000%"},
-            {"Loss Rate", "100%"},
-            {"Win Rate", "0%"},
-            {"Profit-Loss Ratio", "1.81"},
-            {"Alpha", "-0.015"},
-            {"Beta", "-0.001"},
-            {"Annual Standard Deviation", "0.001"},
+            {"Expectancy", "-0.964"},
+            {"Start Equity", "10000000"},
+            {"End Equity", "9999422.04"},
+            {"Net Profit", "-0.006%"},
+            {"Sharpe Ratio", "-33.13"},
+            {"Sortino Ratio", "-33.13"},
+            {"Probabilistic Sharpe Ratio", "0.023%"},
+            {"Loss Rate", "99%"},
+            {"Win Rate", "1%"},
+            {"Profit-Loss Ratio", "4.14"},
+            {"Alpha", "-0.01"},
+            {"Beta", "-0"},
+            {"Annual Standard Deviation", "0"},
             {"Annual Variance", "0"},
-            {"Information Ratio", "-8.944"},
+            {"Information Ratio", "-8.922"},
             {"Tracking Error", "0.223"},
-            {"Treynor Ratio", "27.031"},
-            {"Total Fees", "$1587.00"},
-            {"Estimated Strategy Capacity", "$64000.00"},
-            {"Lowest Capacity Asset", "IBM R735QTJ8XC9X"},
-            {"Portfolio Turnover", "1.86%"},
-            {"OrderListHash", "2eabc44b80b0e62ef5789586f781a6ba"}
+            {"Treynor Ratio", "95.517"},
+            {"Total Fees", "$580.00"},
+            {"Estimated Strategy Capacity", "$39000000.00"},
+            {"Lowest Capacity Asset", "AIG R735QTJ8XC9X"},
+            {"Portfolio Turnover", "0.16%"},
+            {"OrderListHash", "8adab69b1043f4bb77c8570b5d63ce77"}
         };
     }
 }

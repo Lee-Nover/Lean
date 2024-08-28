@@ -76,7 +76,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 if (!expectedContracts.Contains(esOption))
                 {
-                    throw new Exception($"Contract {esOption} was not found in the chain");
+                    throw new RegressionTestException($"Contract {esOption} was not found in the chain");
                 }
             }
 
@@ -90,12 +90,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Ran at the end of the algorithm to ensure the algorithm has no holdings
         /// </summary>
-        /// <exception cref="Exception">The algorithm has holdings</exception>
+        /// <exception cref="RegressionTestException">The algorithm has holdings</exception>
         public override void OnEndOfAlgorithm()
         {
             if (Portfolio.Invested)
             {
-                throw new Exception($"Expected no holdings at end of algorithm, but are invested in: {string.Join(", ", Portfolio.Keys)}");
+                throw new RegressionTestException($"Expected no holdings at end of algorithm, but are invested in: {string.Join(", ", Portfolio.Keys)}");
             }
         }
 
@@ -107,7 +107,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -120,6 +120,11 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
@@ -130,6 +135,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Compounding Annual Return", "-4.637%"},
             {"Drawdown", "5.200%"},
             {"Expectancy", "-0.111"},
+            {"Start Equity", "100000"},
+            {"End Equity", "97715.91"},
             {"Net Profit", "-2.284%"},
             {"Sharpe Ratio", "-0.555"},
             {"Sortino Ratio", "-0.069"},
@@ -148,7 +155,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$120000000.00"},
             {"Lowest Capacity Asset", "ES XFH59UPBIJ7O|ES XFH59UK0MYO1"},
             {"Portfolio Turnover", "3.67%"},
-            {"OrderListHash", "dd5c71e480a03eb770e6f7bd8bdb106d"}
+            {"OrderListHash", "e47aef0b25234f05253cc95bc23c34ee"}
         };
     }
 }

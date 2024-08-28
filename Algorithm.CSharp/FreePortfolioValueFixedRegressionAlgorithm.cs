@@ -39,7 +39,7 @@ namespace QuantConnect.Algorithm.CSharp
             var freePortfolioValue = Portfolio.TotalPortfolioValue - Portfolio.TotalPortfolioValueLessFreeBuffer;
             if (freePortfolioValue != 500)
             {
-                throw new Exception($"Unexpected FreePortfolioValue value: {freePortfolioValue}");
+                throw new RegressionTestException($"Unexpected FreePortfolioValue value: {freePortfolioValue}");
             }
         }
 
@@ -51,9 +51,11 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Orders", "2"},
             {"Average Win", "0%"},
             {"Average Loss", "0.00%"},
-            {"Compounding Annual Return", "8.183%"},
+            {"Compounding Annual Return", "8.184%"},
             {"Drawdown", "55.100%"},
             {"Expectancy", "-1"},
+            {"Start Equity", "1000000"},
+            {"End Equity", "2256717.28"},
             {"Net Profit", "125.672%"},
             {"Sharpe Ratio", "0.36"},
             {"Sortino Ratio", "0.365"},
@@ -69,10 +71,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Tracking Error", "0.001"},
             {"Treynor Ratio", "0.059"},
             {"Total Fees", "$43.54"},
-            {"Estimated Strategy Capacity", "$430000000.00"},
+            {"Estimated Strategy Capacity", "$800000000.00"},
             {"Lowest Capacity Asset", "SPY R735QTJ8XC9X"},
             {"Portfolio Turnover", "0.03%"},
-            {"OrderListHash", "9dabe5880f750e9f3518d8f1a362d98e"}
+            {"OrderListHash", "35a80cea61c70c130ca87efeaa06cee6"}
         };
     }
 }

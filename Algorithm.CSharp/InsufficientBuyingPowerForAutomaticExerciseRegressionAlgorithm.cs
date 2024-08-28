@@ -53,7 +53,7 @@ namespace QuantConnect.Algorithm.CSharp
             AddOptionContract(_option);
         }
 
-        public override void OnData(Slice data)
+        public override void OnData(Slice slice)
         {
             // We are done with buying
             if (_stockBought && _optionSold)
@@ -78,19 +78,19 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (!_optionAssigned)
             {
-                throw new Exception("Expected option to have been assigned before the margin call " +
+                throw new RegressionTestException("Expected option to have been assigned before the margin call " +
                     "(which should have been triggered by the auto-exercise of the option with inssuficient margin).");
             }
 
             if (_marginCallReceived)
             {
-                throw new Exception("Received multiple margin calls. Expected just one.");
+                throw new RegressionTestException("Received multiple margin calls. Expected just one.");
             }
 
             var request = requests.Single();
             if (request.Symbol != _stock)
             {
-                throw new Exception("Expected margin call for the stock, but got margin call for: " + request.Symbol);
+                throw new RegressionTestException("Expected margin call for the stock, but got margin call for: " + request.Symbol);
             }
 
             _marginCallReceived = true;
@@ -113,7 +113,7 @@ namespace QuantConnect.Algorithm.CSharp
                     {
                         if (!_stockBought)
                         {
-                            throw new Exception("Stock should have been bought first");
+                            throw new RegressionTestException("Stock should have been bought first");
                         }
 
                         _optionSold = true;
@@ -122,7 +122,7 @@ namespace QuantConnect.Algorithm.CSharp
                     {
                         if (!_optionSold)
                         {
-                            throw new Exception("Option should have been sold first");
+                            throw new RegressionTestException("Option should have been sold first");
                         }
 
                         _optionAssigned = true;
@@ -130,7 +130,7 @@ namespace QuantConnect.Algorithm.CSharp
                 }
                 else
                 {
-                    throw new Exception("Unexpected symbol: " + orderEvent.Symbol);
+                    throw new RegressionTestException("Unexpected symbol: " + orderEvent.Symbol);
                 }
             }
         }
@@ -139,22 +139,22 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (!_stockBought)
             {
-                throw new Exception("Stock was not bought");
+                throw new RegressionTestException("Stock was not bought");
             }
 
             if (!_optionSold)
             {
-                throw new Exception("Option was not sold");
+                throw new RegressionTestException("Option was not sold");
             }
 
             if (!_optionAssigned)
             {
-                throw new Exception("Option was not assigned");
+                throw new RegressionTestException("Option was not assigned");
             }
 
             if (!_marginCallReceived)
             {
-                throw new Exception("Margin call was not received");
+                throw new RegressionTestException("Margin call was not received");
             }
         }
 
@@ -166,7 +166,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -179,6 +179,11 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
@@ -189,6 +194,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Compounding Annual Return", "-67.963%"},
             {"Drawdown", "2.900%"},
             {"Expectancy", "-1"},
+            {"Start Equity", "100000"},
+            {"End Equity", "98248.35"},
             {"Net Profit", "-1.752%"},
             {"Sharpe Ratio", "-6.542"},
             {"Sortino Ratio", "0"},
@@ -207,7 +214,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$2400000.00"},
             {"Lowest Capacity Asset", "GOOCV 305RBQ20WHPNQ|GOOCV VP83T1ZUHROL"},
             {"Portfolio Turnover", "54.01%"},
-            {"OrderListHash", "72e36e29e49caae435accc583f060c47"}
+            {"OrderListHash", "0d84251bbf98ebbe616d35acdd959c85"}
         };
     }
 }

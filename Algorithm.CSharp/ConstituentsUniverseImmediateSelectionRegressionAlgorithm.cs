@@ -59,20 +59,20 @@ namespace QuantConnect.Algorithm.CSharp
                 // Selection should be happening right on algorithm start
                 if (Time != StartDate)
                 {
-                    throw new Exception($"Universe selection should have been triggered right away on {StartDate} " +
+                    throw new RegressionTestException($"Universe selection should have been triggered right away on {StartDate} " +
                         $"but happened on {Time}");
                 }
 
                 // Constituents should have been added to the algorithm
                 if (changes.AddedSecurities.Count != _expectedConstituents.Count)
                 {
-                    throw new Exception($"Expected {_expectedConstituents.Count} stocks to be added to the algorithm, " +
+                    throw new RegressionTestException($"Expected {_expectedConstituents.Count} stocks to be added to the algorithm, " +
                         $"instead added: {changes.AddedSecurities.Count}");
                 }
 
                 if (!_expectedConstituents.All(constituent => changes.AddedSecurities.Any(security => security.Symbol == constituent)))
                 {
-                    throw new Exception("Not all constituents were added to the algorithm");
+                    throw new RegressionTestException("Not all constituents were added to the algorithm");
                 }
 
                 _securitiesChanged = true;
@@ -83,7 +83,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (!_securitiesChanged)
             {
-                throw new Exception("Expected events didn't happen");
+                throw new RegressionTestException("Expected events didn't happen");
             }
         }
 
@@ -95,7 +95,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -108,6 +108,11 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
@@ -118,6 +123,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100000"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
             {"Sortino Ratio", "0"},

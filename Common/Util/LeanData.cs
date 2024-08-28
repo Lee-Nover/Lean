@@ -18,12 +18,14 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using NodaTime;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
 using QuantConnect.Data.Consolidators;
 using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Future;
@@ -37,6 +39,12 @@ namespace QuantConnect.Util
     /// </summary>
     public static class LeanData
     {
+        private static readonly HashSet<Type> _strictDailyEndTimesDataTypes = new()
+        {
+            // the underlying could yield auxiliary data which we don't want to change
+            typeof(TradeBar), typeof(QuoteBar), typeof(ZipEntryName), typeof(BaseDataCollection)
+        };
+
         /// <summary>
         /// The different <see cref="SecurityType"/> used for data paths
         /// </summary>
@@ -91,7 +99,7 @@ namespace QuantConnect.Util
                     switch (resolution)
                     {
                         case Resolution.Tick:
-                            var tick = (Tick) data;
+                            var tick = (Tick)data;
                             if (tick.TickType == TickType.Trade)
                             {
                                 return ToCsv(milliseconds, Scale(tick.LastPrice), tick.Quantity, tick.ExchangeCode, tick.SaleCondition, tick.Suspicious ? "1" : "0");
@@ -232,7 +240,7 @@ namespace QuantConnect.Util
                     switch (resolution)
                     {
                         case Resolution.Tick:
-                            var tick = (Tick) data;
+                            var tick = (Tick)data;
                             return ToCsv(milliseconds, tick.LastPrice, tick.Quantity, string.Empty, string.Empty, "0");
                         case Resolution.Second:
                         case Resolution.Minute:
@@ -400,7 +408,7 @@ namespace QuantConnect.Util
                             if (tick.TickType == TickType.Trade)
                             {
                                 return ToCsv(milliseconds,
-                                             tick.LastPrice, tick.Quantity, tick.ExchangeCode, tick.SaleCondition, tick.Suspicious ? "1": "0");
+                                             tick.LastPrice, tick.Quantity, tick.ExchangeCode, tick.SaleCondition, tick.Suspicious ? "1" : "0");
                             }
                             if (tick.TickType == TickType.Quote)
                             {
@@ -709,7 +717,7 @@ namespace QuantConnect.Util
 
                     string expirationTag;
                     var expiryDate = symbol.ID.Date;
-                    if(expiryDate != SecurityIdentifier.DefaultDate)
+                    if (expiryDate != SecurityIdentifier.DefaultDate)
                     {
                         var monthsToAdd = FuturesExpiryUtilityFunctions.GetDeltaBetweenContractMonthAndContractExpiry(symbol.ID.Symbol, expiryDate.Date);
                         var contractYearMonth = expiryDate.AddMonths(monthsToAdd).ToStringInvariant(DateFormat.YearMonth);
@@ -911,7 +919,7 @@ namespace QuantConnect.Util
         /// </summary>
         private static long Scale(decimal value)
         {
-            return (long)(value*10000);
+            return (long)(value * 10000);
         }
 
         /// <summary>
@@ -925,7 +933,7 @@ namespace QuantConnect.Util
                 var value = args[i];
                 if (value is decimal)
                 {
-                    args[i] = ((decimal) value).Normalize();
+                    args[i] = ((decimal)value).Normalize();
                 }
             }
 
@@ -1005,7 +1013,7 @@ namespace QuantConnect.Util
             {
                 return SecurityType.Base;
             }
-            return (SecurityType) Enum.Parse(typeof(SecurityType), securityType, true);
+            return (SecurityType)Enum.Parse(typeof(SecurityType), securityType, true);
         }
 
         /// <summary>
@@ -1070,7 +1078,7 @@ namespace QuantConnect.Util
 
                 tickType = GetCommonTickType(symbol.SecurityType);
                 var fileName = Path.GetFileNameWithoutExtension(filePath);
-                if (fileName.Contains("_"))
+                if (fileName.Contains('_', StringComparison.InvariantCulture))
                 {
                     // example: 20140606_openinterest_american.zip
                     var tickTypePosition = 1;
@@ -1113,7 +1121,7 @@ namespace QuantConnect.Util
                 // find where the useful part of the path starts - i.e. the securityType
                 var startIndex = info.FindIndex(x => SecurityTypeAsDataPath.Contains(x.ToLowerInvariant()));
 
-                if(startIndex == -1)
+                if (startIndex == -1)
                 {
                     if (Log.DebuggingEnabled)
                     {
@@ -1170,17 +1178,22 @@ namespace QuantConnect.Util
                 {
                     // Gather components used to create the security
                     market = info[startIndex + 1];
-                    ticker = info[startIndex + 3];
-                    
-                    // Remove the ticktype from the ticker (Only exists in Crypto and Future data but causes no issues)
-                    ticker = ticker.Split('_').First();
+                    var components = info[startIndex + 3].Split('_');
 
-                    // If resolution is Daily or Hour, we do not need to set the date
+                    // Remove the ticktype from the ticker (Only exists in Crypto and Future data but causes no issues)
+                    ticker = components[0];
+
                     if (resolution < Resolution.Hour)
                     {
                         // Future options are special and have the following format Market/Resolution/Ticker/FutureExpiry/Date
                         var dateIndex = securityType == SecurityType.FutureOption ? startIndex + 5 : startIndex + 4;
                         date = Parse.DateTimeExact(info[dateIndex].Substring(0, 8), DateFormat.EightCharacter);
+                    }
+                    // If resolution is Daily or Hour for options and index options, we can only get the year from the path
+                    else if (securityType == SecurityType.Option || securityType == SecurityType.IndexOption)
+                    {
+                        var year = int.Parse(components[1], CultureInfo.InvariantCulture);
+                        date = new DateTime(year, 01, 01);
                     }
                 }
 
@@ -1195,7 +1208,7 @@ namespace QuantConnect.Util
                     var underlyingFuture = Symbol.CreateFuture(underlyingTicker, market, underlyingFutureExpiryDate);
                     symbol = Symbol.CreateCanonicalOption(underlyingFuture);
                 }
-                else if(securityType == SecurityType.IndexOption)
+                else if (securityType == SecurityType.IndexOption)
                 {
                     var underlyingTicker = OptionSymbol.MapToUnderlying(ticker, securityType);
                     // Create our underlying index and then the Canonical option
@@ -1207,9 +1220,9 @@ namespace QuantConnect.Util
                     Type dataType = null;
                     if (isUniverses && info[startIndex + 3].Equals("etf", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        dataType = typeof(ETFConstituentData);
+                        dataType = typeof(ETFConstituentUniverse);
                     }
-                    symbol = Symbol.Create(ticker, securityType, market, baseDataType: dataType);
+                    symbol = CreateSymbol(ticker, securityType, market, dataType, date);
                 }
 
             }
@@ -1220,6 +1233,37 @@ namespace QuantConnect.Util
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Creates a new Symbol based on parsed data path information.
+        /// </summary>
+        /// <param name="ticker">The parsed ticker symbol.</param>
+        /// <param name="securityType">The parsed type of security.</param>
+        /// <param name="market">The parsed market or exchange.</param>
+        /// <param name="dataType">Optional type used for generating the base data SID (applicable only for SecurityType.Base).</param>
+        /// <param name="mappingResolveDate">The date used in path parsing to create the correct symbol.</param>
+        /// <returns>A unique security identifier.</returns>
+        /// <example>
+        /// <code>
+        /// path: equity/usa/minute/spwr/20071223_trade.zip
+        /// ticker: spwr
+        /// securityType: equity
+        /// market: usa
+        /// mappingResolveDate: 2007/12/23
+        /// </code>
+        /// </example>
+        private static Symbol CreateSymbol(string ticker, SecurityType securityType, string market, Type dataType, DateTime mappingResolveDate = default)
+        {
+            if (mappingResolveDate != default && (securityType == SecurityType.Equity || securityType == SecurityType.Option))
+            {
+                var symbol = new Symbol(SecurityIdentifier.GenerateEquity(ticker, market, mappingResolveDate: mappingResolveDate), ticker);
+                return securityType == SecurityType.Option ? Symbol.CreateCanonicalOption(symbol) : symbol;
+            }
+            else
+            {
+                return Symbol.Create(ticker, securityType, market, baseDataType: dataType);
+            }
         }
 
         private static List<string> SplitDataPath(string fileName)
@@ -1262,18 +1306,18 @@ namespace QuantConnect.Util
         {
             return Aggregate(new QuoteBarConsolidator(resolution), bars, symbol);
         }
-        
-         /// <summary>
-         /// Aggregates a list of ticks at the requested resolution
-         /// </summary>
-         /// <param name="ticks">List of quote ticks</param>
-         /// <param name="symbol">Symbol of all ticks</param>
-         /// <param name="resolution">Desired resolution for new <see cref="QuoteBar"/>s</param>
-         /// <returns>List of aggregated <see cref="QuoteBar"/>s</returns>
-         public static IEnumerable<QuoteBar> AggregateTicks(IEnumerable<Tick> ticks, Symbol symbol, TimeSpan resolution)
+
+        /// <summary>
+        /// Aggregates a list of ticks at the requested resolution
+        /// </summary>
+        /// <param name="ticks">List of quote ticks</param>
+        /// <param name="symbol">Symbol of all ticks</param>
+        /// <param name="resolution">Desired resolution for new <see cref="QuoteBar"/>s</param>
+        /// <returns>List of aggregated <see cref="QuoteBar"/>s</returns>
+        public static IEnumerable<QuoteBar> AggregateTicks(IEnumerable<Tick> ticks, Symbol symbol, TimeSpan resolution)
         {
             return Aggregate(new TickQuoteBarConsolidator(resolution), ticks, symbol);
-         }
+        }
 
         /// <summary>
         /// Aggregates a list of ticks at the requested resolution
@@ -1285,6 +1329,161 @@ namespace QuantConnect.Util
         public static IEnumerable<TradeBar> AggregateTicksToTradeBars(IEnumerable<Tick> ticks, Symbol symbol, TimeSpan resolution)
         {
             return Aggregate(new TickConsolidator(resolution), ticks, symbol);
+        }
+
+        /// <summary>
+        /// Helper method to return the start time and period of a bar the given point time should be part of
+        /// </summary>
+        /// <param name="exchangeTimeZoneDate">The point in time we want to get the bar information about</param>
+        /// <param name="exchange">The associated security exchange</param>
+        /// <param name="extendedMarketHours">True if extended market hours should be taken into consideration</param>
+        /// <returns>The calendar information that holds a start time and a period</returns>
+        public static CalendarInfo GetDailyCalendar(DateTime exchangeTimeZoneDate, SecurityExchange exchange, bool extendedMarketHours)
+        {
+            return GetDailyCalendar(exchangeTimeZoneDate, exchange.Hours, extendedMarketHours);
+        }
+
+        /// <summary>
+        /// Helper method to return the start time and period of a bar the given point time should be part of
+        /// </summary>
+        /// <param name="exchangeTimeZoneDate">The point in time we want to get the bar information about</param>
+        /// <param name="exchangeHours">The associated exchange hours</param>
+        /// <param name="extendedMarketHours">True if extended market hours should be taken into consideration</param>
+        /// <returns>The calendar information that holds a start time and a period</returns>
+        public static CalendarInfo GetDailyCalendar(DateTime exchangeTimeZoneDate, SecurityExchangeHours exchangeHours, bool extendedMarketHours)
+        {
+            var startTime = exchangeHours.GetPreviousMarketOpen(exchangeTimeZoneDate, extendedMarketHours);
+            var endTime = exchangeHours.GetNextMarketClose(startTime, extendedMarketHours);
+
+            // Let's not consider regular market gaps like when market closes at 16:15 and opens again at 16:30
+            while (true)
+            {
+                var potentialEnd = exchangeHours.GetNextMarketClose(endTime, extendedMarketHours);
+                if (potentialEnd.Date != endTime.Date)
+                {
+                    break;
+                }
+                endTime = potentialEnd;
+            }
+
+            var period = endTime - startTime;
+            return new CalendarInfo(startTime, period);
+        }
+
+        /// <summary>
+        /// Helper method to get the next daily end time, taking into account strict end times if appropriate
+        /// </summary>
+        public static DateTime GetNextDailyEndTime(Symbol symbol, DateTime exchangeTimeZoneDate, SecurityExchangeHours exchangeHours)
+        {
+            var nextMidnight = exchangeTimeZoneDate.Date.AddDays(1);
+            if (!UseStrictEndTime(true, symbol, Time.OneDay, exchangeHours))
+            {
+                return nextMidnight;
+            }
+
+            var nextMarketClose = exchangeHours.GetNextMarketClose(exchangeTimeZoneDate, extendedMarketHours: false);
+            if (nextMarketClose > nextMidnight)
+            {
+                // if exchangeTimeZoneDate is after the previous close, the next close might be tomorrow
+                if (!exchangeHours.IsOpen(exchangeTimeZoneDate, extendedMarketHours: false))
+                {
+                    return nextMarketClose;
+                }
+                return nextMidnight;
+            }
+            return nextMarketClose;
+        }
+
+        /// <summary>
+        /// Helper method that defines the types of options that should use scale factor
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool OptionUseScaleFactor(Symbol symbol)
+        {
+            return symbol.SecurityType == SecurityType.Option || symbol.SecurityType == SecurityType.IndexOption;
+        }
+
+        /// <summary>
+        /// Helper method to determine if we should use strict end time
+        /// </summary>
+        /// <param name="symbol">The associated symbol</param>
+        /// <param name="increment">The datas time increment</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool UseStrictEndTime(bool dailyStrictEndTimeEnabled, Symbol symbol, TimeSpan increment, SecurityExchangeHours exchangeHours)
+        {
+            if (exchangeHours.IsMarketAlwaysOpen
+                || increment <= Time.OneHour
+                || symbol.SecurityType == SecurityType.Cfd && symbol.ID.Market == Market.Oanda
+                || symbol.SecurityType == SecurityType.Forex
+                || symbol.SecurityType == SecurityType.Base)
+            {
+                return false;
+            }
+            return dailyStrictEndTimeEnabled;
+        }
+
+        /// <summary>
+        /// Helper method to determine if we should use strict end time
+        /// </summary>
+        public static bool UseDailyStrictEndTimes(IAlgorithmSettings settings, BaseDataRequest request, Symbol symbol, TimeSpan increment)
+        {
+            return UseDailyStrictEndTimes(settings, request.DataType, symbol, increment, request.ExchangeHours);
+        }
+
+        /// <summary>
+        /// Helper method to determine if we should use strict end time
+        /// </summary>
+        public static bool UseDailyStrictEndTimes(IAlgorithmSettings settings, Type dataType, Symbol symbol, TimeSpan increment, SecurityExchangeHours exchangeHours)
+        {
+            return UseDailyStrictEndTimes(dataType) && UseStrictEndTime(settings.DailyPreciseEndTime, symbol, increment, exchangeHours);
+        }
+
+        /// <summary>
+        /// True if this data type should use strict daily end times
+        /// </summary>
+        public static bool UseDailyStrictEndTimes(Type dataType)
+        {
+            return dataType != null && _strictDailyEndTimesDataTypes.Contains(dataType);
+        }
+
+        /// <summary>
+        /// Helper method that if appropiate, will set the Time and EndTime of the given data point to it's daily strict times
+        /// </summary>
+        /// <param name="baseData">The target data point</param>
+        /// <param name="exchange">The associated exchange hours</param>
+        /// <remarks>This method is used to set daily times on pre existing data, assuming it does not cover extended market hours</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool SetStrictEndTimes(IBaseData baseData, SecurityExchangeHours exchange)
+        {
+            if (baseData == null)
+            {
+                return false;
+            }
+
+            var dataType = baseData.GetType();
+            if (!UseDailyStrictEndTimes(dataType))
+            {
+                return false;
+            }
+
+            var isZipEntryName = dataType == typeof(ZipEntryName);
+            if (isZipEntryName && baseData.Time.Hour == 0)
+            {
+                // zip entry names are emitted point in time for a date, see BaseDataSubscriptionEnumeratorFactory. When setting the strict end times
+                // we will move it to the previous day daily times, because daily market data on disk end time is midnight next day, so here we add 1 day
+                baseData.Time += Time.OneDay;
+                baseData.EndTime += Time.OneDay;
+            }
+
+            var dailyCalendar = GetDailyCalendar(baseData.EndTime, exchange, extendedMarketHours: false);
+            if (!isZipEntryName && dailyCalendar.End < baseData.Time)
+            {
+                // this data point we were given is probably from extended market hours which we don't support for daily backtesting data
+                return false;
+            }
+            baseData.Time = dailyCalendar.Start;
+            baseData.EndTime = dailyCalendar.End;
+            return true;
         }
 
         /// <summary>

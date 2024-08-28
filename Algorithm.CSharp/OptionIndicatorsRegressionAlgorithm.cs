@@ -32,6 +32,8 @@ namespace QuantConnect.Algorithm.CSharp
         private Theta _theta;
         private Rho _rho;
 
+        protected virtual string ExpectedGreeks { get; set; } = "Implied Volatility: 0.45254,Delta: -0.0092,Gamma: 0.00036,Vega: 0.03562,Theta: -0.0387,Rho: 0.00045";
+
         public override void Initialize()
         {
             SetStartDate(2014, 6, 5);
@@ -42,7 +44,12 @@ namespace QuantConnect.Algorithm.CSharp
             var option = QuantConnect.Symbol.CreateOption("AAPL", Market.USA, OptionStyle.American, OptionRight.Put, 505m, new DateTime(2014, 6, 27));
             AddOptionContract(option, Resolution.Minute);
 
-            _impliedVolatility = IV(option, period: 2);
+            InitializeIndicators(option);
+        }
+
+        protected void InitializeIndicators(Symbol option)
+        {
+            _impliedVolatility = IV(option);
             _delta = D(option, optionModel: OptionPricingModelType.BinomialCoxRossRubinstein, ivModel: OptionPricingModelType.BlackScholes);
             _gamma = G(option, optionModel: OptionPricingModelType.ForwardTree, ivModel: OptionPricingModelType.BlackScholes);
             _vega = V(option, optionModel: OptionPricingModelType.ForwardTree, ivModel: OptionPricingModelType.BlackScholes);
@@ -54,14 +61,15 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (_impliedVolatility == 0m || _delta == 0m || _gamma == 0m || _vega == 0m || _theta == 0m || _rho == 0m)
             {
-                throw new Exception("Expected IV/greeks calculated");
+                throw new RegressionTestException("Expected IV/greeks calculated");
             }
-            Debug(@$"Implied Volatility: {_impliedVolatility},
-Delta: {_delta},
-Gamma: {_gamma},
-Vega: {_vega},
-Theta: {_theta},
-Rho: {_rho}");
+            var result = @$"Implied Volatility: {_impliedVolatility},Delta: {_delta},Gamma: {_gamma},Vega: {_vega},Theta: {_theta},Rho: {_rho}";
+
+            Debug(result);
+            if (result != ExpectedGreeks)
+            {
+                throw new RegressionTestException($"Unexpected greek values {result}. Expected {ExpectedGreeks}");
+            }
         }
 
         /// <summary>
@@ -72,12 +80,12 @@ Rho: {_rho}");
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public virtual List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 1974;
+        public virtual long DataPoints => 1974;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -85,9 +93,14 @@ Rho: {_rho}");
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
-        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        public virtual Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
             {"Total Orders", "0"},
             {"Average Win", "0%"},
@@ -95,6 +108,8 @@ Rho: {_rho}");
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100000"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
             {"Sortino Ratio", "0"},

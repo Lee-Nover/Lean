@@ -37,7 +37,7 @@ using QuantConnect.Lean.Engine.Storage;
 
 namespace QuantConnect.Tests.Engine.DataFeeds
 {
-    [TestFixture]
+    [TestFixture, Parallelizable(ParallelScope.Fixtures)]
     public class CustomLiveDataFeedTests
     {
         private LiveSynchronizer _synchronizer;
@@ -67,7 +67,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             }
 
             var algorithm = new QCAlgorithm();
-            CreateDataFeed();
+            CreateDataFeed(algorithm.Settings);
             var dataManager = new DataManagerStub(algorithm, _feed);
             algorithm.SubscriptionManager.SetDataManager(dataManager);
 
@@ -224,8 +224,8 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                     TickType = TickType.Trade
                 };
                 return new[] { tick, tick2 };
-            }, timeProvider);
-            CreateDataFeed(dataQueueHandler);
+            }, timeProvider, algorithm.Settings);
+            CreateDataFeed(algorithm.Settings, dataQueueHandler);
             var dataManager = new DataManagerStub(algorithm, _feed);
 
             algorithm.SubscriptionManager.SetDataManager(dataManager);
@@ -277,10 +277,17 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                     {
                         slicesEmitted++;
                         dataPointsEmitted += timeSlice.Slice.Values.Count;
-                        Assert.IsTrue(timeSlice.Slice.Values.Any(x => x.Symbol == symbols[0]), $"Slice doesn't contain {symbols[0]}");
-                        Assert.IsTrue(timeSlice.Slice.Values.Any(x => x.Symbol == symbols[1]), $"Slice doesn't contain {symbols[1]}");
-                        Assert.IsTrue(timeSlice.Slice.Values.Any(x => x.Symbol == symbols[2]), $"Slice doesn't contain {symbols[2]}");
-                        Assert.IsTrue(timeSlice.Slice.Values.Any(x => x.Symbol == symbols[3]), $"Slice doesn't contain {symbols[3]}");
+
+                        if (timeSlice.Time.ConvertFromUtc(TimeZones.NewYork).Hour == 0)
+                        {
+                            Assert.IsTrue(timeSlice.Slice.Values.Any(x => x.Symbol == symbols[0]), $"Slice doesn't contain {symbols[0]}");
+                            Assert.IsTrue(timeSlice.Slice.Values.Any(x => x.Symbol == symbols[1]), $"Slice doesn't contain {symbols[1]}");
+                        }
+                        else
+                        {
+                            Assert.IsTrue(timeSlice.Slice.Values.Any(x => x.Symbol == symbols[2]), $"Slice doesn't contain {symbols[2]}");
+                            Assert.IsTrue(timeSlice.Slice.Values.Any(x => x.Symbol == symbols[3]), $"Slice doesn't contain {symbols[3]}");
+                        }
                     }
                 }
             }
@@ -292,7 +299,8 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             timer.Value.Dispose();
             dataManager.RemoveAllSubscriptions();
             dataQueueHandler.DisposeSafely();
-            Assert.AreEqual(14, slicesEmitted);
+            // custom data arrives midnight, daily data 4pm
+            Assert.AreEqual(14 * 2, slicesEmitted);
             Assert.AreEqual(14 * symbols.Count, dataPointsEmitted);
         }
 
@@ -309,7 +317,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             var timeProvider = new ManualTimeProvider(TimeZones.NewYork);
             timeProvider.SetCurrentTime(startDate);
 
-            CreateDataFeed();
+            CreateDataFeed(algorithm.Settings);
             var dataManager = new DataManagerStub(algorithm, _feed);
             algorithm.SubscriptionManager.SetDataManager(dataManager);
 
@@ -374,10 +382,10 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             Assert.AreEqual(slicesEmitted, dataPointsEmitted);
         }
 
-        private void CreateDataFeed(
+        private void CreateDataFeed(IAlgorithmSettings settings,
             FuncDataQueueHandler funcDataQueueHandler = null)
         {
-            _feed = new TestableLiveTradingDataFeed(funcDataQueueHandler ?? new FuncDataQueueHandler(x => Enumerable.Empty<BaseData>(), new RealTimeProvider()));
+            _feed = new TestableLiveTradingDataFeed(settings, funcDataQueueHandler ?? new FuncDataQueueHandler(x => Enumerable.Empty<BaseData>(), RealTimeProvider.Instance, new AlgorithmSettings()));
         }
 
         private void RunLiveDataFeed(
@@ -410,7 +418,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 // use local file instead of remote file
                 var source = GetLocalFileName(config.Symbol.Value, "test");
 
-                return new SubscriptionDataSource(source, SubscriptionTransportMedium.RemoteFile);
+                return new SubscriptionDataSource(source, SubscriptionTransportMedium.LocalFile);
             }
 
             public static string GetLocalFileName(string ticker, string fileExtension)

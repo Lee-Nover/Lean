@@ -44,7 +44,7 @@ namespace QuantConnect.Algorithm.CSharp
                 var expectedTime = _consolidationDaily.Dequeue();
                 if (expectedTime != Time)
                 {
-                    throw new Exception($"Unexpected consolidation time {expectedTime} != {Time}");
+                    throw new RegressionTestException($"Unexpected consolidation time {expectedTime} != {Time}");
                 }
 
                 if (!Portfolio.Invested)
@@ -52,9 +52,10 @@ namespace QuantConnect.Algorithm.CSharp
                     SetHoldings("SPY", 1);
                 }
             });
-            _consolidationDaily.Enqueue(new DateTime(2013, 10, 8, 0, 0, 0));
-            _consolidationDaily.Enqueue(new DateTime(2013, 10, 9, 0, 0, 0));
-            _consolidationDaily.Enqueue(new DateTime(2013, 10, 10, 0, 0, 0));
+            _consolidationDaily.Enqueue(new DateTime(2013, 10, 7, 16, 0, 0));
+            _consolidationDaily.Enqueue(new DateTime(2013, 10, 8, 16, 0, 0));
+            _consolidationDaily.Enqueue(new DateTime(2013, 10, 9, 16, 0, 0));
+            _consolidationDaily.Enqueue(new DateTime(2013, 10, 10, 16, 0, 0));
 
             Consolidate("SPY", TimeSpan.FromHours(3), (TradeBar bar) =>
             {
@@ -62,7 +63,7 @@ namespace QuantConnect.Algorithm.CSharp
                 var expectedTime = _consolidationHourly.Dequeue();
                 if (expectedTime != Time)
                 {
-                    throw new Exception($"Unexpected consolidation time {expectedTime} != {Time} 3 hours");
+                    throw new RegressionTestException($"Unexpected consolidation time {expectedTime} != {Time} 3 hours");
                 }
             });
             _consolidationHourly.Enqueue(new DateTime(2013, 10, 7, 12, 0, 0));
@@ -83,7 +84,7 @@ namespace QuantConnect.Algorithm.CSharp
                 var expectedTime = _consolidation2Days.Dequeue();
                 if (expectedTime != Time)
                 {
-                    throw new Exception($"Unexpected consolidation time {expectedTime} != {Time} 2 days");
+                    throw new RegressionTestException($"Unexpected consolidation time {expectedTime} != {Time} 2 days");
                 }
             });
             _consolidation2Days.Enqueue(new DateTime(2013, 10, 9, 9, 0, 0));
@@ -93,7 +94,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (_consolidationDaily.Count != 0 || _consolidationHourly.Count != 0 || _consolidation2Days.Count != 0)
             {
-                throw new Exception($"Unexpected consolidation count");
+                throw new RegressionTestException($"Unexpected consolidation count");
             }
         }
 
@@ -105,7 +106,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp };
+        public List<Language> Languages { get; } = new() { Language.CSharp };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
@@ -118,6 +119,11 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
@@ -128,6 +134,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Compounding Annual Return", "186.478%"},
             {"Drawdown", "1.500%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "101062.91"},
             {"Net Profit", "1.063%"},
             {"Sharpe Ratio", "5.448"},
             {"Sortino Ratio", "0"},
@@ -146,7 +154,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$130000000.00"},
             {"Lowest Capacity Asset", "SPY R735QTJ8XC9X"},
             {"Portfolio Turnover", "25.24%"},
-            {"OrderListHash", "71685a0bdd3691e202081527555a1c89"}
+            {"OrderListHash", "bbda6d0a04ae0b87b2fa10e036296cbb"}
         };
     }
 }

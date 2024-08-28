@@ -24,22 +24,43 @@ namespace QuantConnect.Tests.Common.Data
     [TestFixture]
     public class DividendYieldProviderTests
     {
-        [TestCase("19700306", 0.0)]   // Date in before the first date in file
-        [TestCase("20200205", 0.04147)]
-        [TestCase("20200206", 0.03355)]
-        [TestCase("20200207", 0.03355)]
-        [TestCase("20210203", 0.01676)]
-        [TestCase("20210204", 0.01239)]
-        [TestCase("20210205", 0.01239)]
-        [TestCase("20491231", 0.01239)]   // Date in far future, assuming same rate
-        public void GetDividendYieldRate(string dateString, double expected)
+        // Without a price:
+        [TestCase("19700306", null, 0.0)]           // Date in before the first date in file
+        [TestCase("20191107", null, 0.0118177)]     // Dividend on this date
+        [TestCase("20191108", null, 0.0118177)]     // Same dividend yield is fill-forwarded for every day until next dividend
+        [TestCase("20200205", null, 0.0118177)]
+        [TestCase("20200206", null, 0.0118177)]
+        [TestCase("20200207", null, 0.0094708)]     // Dividend on this date
+        [TestCase("20200208", null, 0.0094708)]
+        [TestCase("20210203", null, 0.0067840)]
+        [TestCase("20210204", null, 0.0067840)]
+        [TestCase("20210205", null, 0.0059684)]     // Dividend on this date
+        [TestCase("20210208", null, 0.0059684)]
+        [TestCase("20210209", null, 0.0059684)]
+        [TestCase("20491231", null, 0.0059684)]     // Date in far future, assuming same rate
+        // With price:
+        [TestCase("19700306", 1.0, 0.0)]            // Date in before the first date in file
+        [TestCase("20191107", 257.24, 0.0118177)]   // Dividend on this date
+        [TestCase("20191108", 259.43, 0.0117179)]
+        [TestCase("20200205", 318.85, 0.0095342)]
+        [TestCase("20200206", 321.45, 0.0094571)]
+        [TestCase("20200207", 325.21, 0.0094708)]   // Dividend on this date
+        [TestCase("20200210", 320.03, 0.0096240)]
+        [TestCase("20210203", 134.99, 0.0059819)]
+        [TestCase("20210204", 133.94, 0.0060288)]
+        [TestCase("20210205", 137.39, 0.0059684)]   // Dividend on this date
+        [TestCase("20210208", 136.76, 0.0059959)]
+        [TestCase("20210209", 136.91, 0.0059893)]   // Date in far future, assuming same rate
+        public void GetDividendYieldRate(string dateString, double? price, double expected)
         {
             var symbol = Symbols.AAPL;
             var provider = new DividendYieldProvider(symbol);
             var dateTime = Parse.DateTimeExact(dateString, "yyyyMMdd");
-            var result = provider.GetDividendYield(dateTime);
+            var result = price.HasValue
+                ? provider.GetDividendYield(dateTime, Convert.ToDecimal(price.Value))
+                : provider.GetDividendYield(dateTime);
 
-            Assert.AreEqual(expected, (double)result, 0.0001d);
+            Assert.AreEqual(expected, (double)result, 1e-7);
         }
 
         [TestCase("19700101", 0.0)]   // Date before Time.Start
@@ -60,7 +81,6 @@ namespace QuantConnect.Tests.Common.Data
         {
             var symbol = Symbols.AAPL;
             using var fileProviderTest = new DividendYieldProviderTest(symbol);
-            fileProviderTest.Reset();
 
             fileProviderTest.GetDividendYield(new DateTime(2020, 1, 1));
             var fetchCount = fileProviderTest.FetchCount;
@@ -68,43 +88,51 @@ namespace QuantConnect.Tests.Common.Data
             fileProviderTest.GetDividendYield(new DateTime(2020, 1, 1));
             Assert.AreEqual(fetchCount, fileProviderTest.FetchCount);
 
-            Thread.Sleep(TimeSpan.FromSeconds(10));
-
-            fileProviderTest.GetDividendYield(new DateTime(2020, 1, 1));
-            Assert.Greater(fileProviderTest.FetchCount, fetchCount);
+            var counter = 0;
+            while (counter++ < 10)
+            {
+                fileProviderTest.GetDividendYield(new DateTime(2020, 1, 1));
+                if (fileProviderTest.FetchCount <= fetchCount)
+                {
+                    Thread.Sleep(250);
+                }
+                else
+                {
+                    break;
+                }
+            }
+            Assert.Less(counter, 10);
         }
 
         [Test]
         public void AnotherSymbolCall()
         {
-            using var fileProviderTest = new DividendYieldProviderTest(Symbols.AAPL);
+            using var fileProviderTest = new DividendYieldProviderTest(Symbol.Create("TEST_A", SecurityType.Equity, QuantConnect.Market.USA));
 
             var applYield = fileProviderTest.GetDividendYield(new DateTime(2020, 1, 1));
             Assert.AreEqual(1, fileProviderTest.FetchCount);
 
-            using var fileProviderTest2 = new DividendYieldProviderTest(Symbols.SPY);
+            using var fileProviderTest2 = new DividendYieldProviderTest(Symbol.Create("TEST_B", SecurityType.Equity, QuantConnect.Market.USA));
 
             var spyYield = fileProviderTest2.GetDividendYield(new DateTime(2020, 1, 1));
             Assert.AreEqual(1, fileProviderTest2.FetchCount);
-
-            Assert.AreNotEqual(applYield, spyYield);
         }
 
         private class DividendYieldProviderTest : DividendYieldProvider, IDisposable
         {
             public int FetchCount { get; set; }
 
-            protected override TimeSpan CacheRefreshPeriod => TimeSpan.FromSeconds(5);
+            protected override TimeSpan CacheRefreshPeriod => TimeSpan.FromSeconds(1);
 
             public DividendYieldProviderTest(Symbol symbol)
-                : base(symbol) 
-            { 
+                : base(symbol)
+            {
             }
 
-            protected override Dictionary<DateTime, decimal> LoadDividendYieldProvider(Symbol symbol)
+            protected override List<BaseData> LoadCorporateEvents(Symbol symbol)
             {
                 FetchCount++;
-                return base.LoadDividendYieldProvider(symbol);
+                return base.LoadCorporateEvents(symbol);
             }
 
             public void Reset()

@@ -15,6 +15,7 @@
 
 using Python.Runtime;
 using QuantConnect.Data;
+using QuantConnect.Data.Fundamental;
 using QuantConnect.Data.Market;
 using QuantConnect.Util;
 using System;
@@ -24,6 +25,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using QuantConnect.Util;
 
 namespace QuantConnect.Python
 {
@@ -79,6 +81,7 @@ namespace QuantConnect.Python
         };
 
         private readonly Symbol _symbol;
+        private readonly bool _isFundamentalType;
         private readonly Dictionary<string, Serie> _series;
 
         private readonly IEnumerable<MemberInfo> _members = Enumerable.Empty<MemberInfo>();
@@ -131,17 +134,20 @@ namespace QuantConnect.Python
             }
 
             var type = data.GetType();
-            IsCustomData = type.Namespace != typeof(Bar).Namespace;
+            _isFundamentalType = type == typeof(Fundamental);
             _symbol = ((IBaseData)data).Symbol;
+            IsCustomData = Extensions.IsCustomDataType(_symbol, type);
 
             if (_symbol.SecurityType == SecurityType.Future) Levels = 3;
             if (_symbol.SecurityType.IsOption()) Levels = 5;
 
             IEnumerable<string> columns = _standardColumns;
 
-            if (IsCustomData)
+            if (IsCustomData || ((IBaseData)data).DataType == MarketDataType.Auxiliary)
             {
-                var keys = (data as DynamicData)?.GetStorageDictionary().ToHashSet(x => x.Key);
+                var keys = (data as DynamicData)?.GetStorageDictionary()
+                    // if this is a PythonData instance we add in '__typename' which we don't want into the data frame
+                    .Where(x => !x.Key.StartsWith("__", StringComparison.InvariantCulture)).ToHashSet(x => x.Key);
 
                 // C# types that are not DynamicData type
                 if (keys == null)
@@ -189,32 +195,41 @@ namespace QuantConnect.Python
         /// <param name="baseData"><see cref="IBaseData"/> object that contains security data</param>
         public void Add(object baseData)
         {
+            var endTime = ((IBaseData)baseData).EndTime;
             foreach (var member in _members)
             {
                 // TODO field/property.GetValue is expensive
                 var key = member.Name.ToLowerInvariant();
-                var endTime = ((IBaseData)baseData).EndTime;
                 var propertyMember = member as PropertyInfo;
                 if (propertyMember != null)
                 {
-                    AddToSeries(key, endTime, propertyMember.GetValue(baseData));
+                    var propertyValue = propertyMember.GetValue(baseData);
+                    if (_isFundamentalType && propertyMember.PropertyType.IsAssignableTo(typeof(FundamentalTimeDependentProperty)))
+                    {
+                        propertyValue = ((FundamentalTimeDependentProperty)propertyValue).Clone(new FixedTimeProvider(endTime));
+                    }
+                    AddToSeries(key, endTime, propertyValue);
                     continue;
                 }
-                var fieldMember = member as FieldInfo;
-                if (fieldMember != null)
+                else
                 {
-                    AddToSeries(key, endTime, fieldMember.GetValue(baseData));
+                    var fieldMember = member as FieldInfo;
+                    if (fieldMember != null)
+                    {
+                        AddToSeries(key, endTime, fieldMember.GetValue(baseData));
+                    }
                 }
             }
 
             var storage = (baseData as DynamicData)?.GetStorageDictionary();
             if (storage != null)
             {
-                var endTime = ((IBaseData) baseData).EndTime;
                 var value = ((IBaseData) baseData).Value;
                 AddToSeries("value", endTime, value);
 
-                foreach (var kvp in storage.Where(x => x.Key != "value"))
+                foreach (var kvp in storage.Where(x => x.Key != "value"
+                    // if this is a PythonData instance we add in '__typename' which we don't want into the data frame
+                    && !x.Key.StartsWith("__", StringComparison.InvariantCulture)))
                 {
                     AddToSeries(kvp.Key, endTime, kvp.Value);
                 }
@@ -524,6 +539,16 @@ namespace QuantConnect.Python
 
                 Values.Add(value);
                 Times.Add(time);
+            }
+        }
+
+        private class FixedTimeProvider : ITimeProvider
+        {
+            private readonly DateTime _time;
+            public DateTime GetUtcNow() => _time;
+            public FixedTimeProvider(DateTime time)
+            {
+                _time = time;
             }
         }
     }

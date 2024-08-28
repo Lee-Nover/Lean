@@ -39,7 +39,7 @@ namespace QuantConnect.Algorithm.CSharp
         public override void Initialize()
         {
             SetStartDate(2014, 6, 5);
-            SetEndDate(2014, 6, 7);
+            SetEndDate(2014, 6, 9);
             SetCash(100000);
 
             var equity = AddEquity("AAPL", Resolution.Daily).Symbol;
@@ -77,7 +77,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (_impliedVolatility == 0m || _delta == 0m || _gamma == 0m || _vega == 0m || _theta == 0m || _rho == 0m)
             {
-                throw new Exception("Expected IV/greeks calculated");
+                throw new RegressionTestException("Expected IV/greeks calculated");
             }
             Debug(@$"Implied Volatility: {_impliedVolatility},
 Delta: {_delta},
@@ -95,17 +95,22 @@ Rho: {_rho}");
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 35;
+        public long DataPoints => 49;
 
         /// <summary>
         /// Data Points count of the algorithm history
         /// </summary>
         public int AlgorithmHistoryDataPoints => 0;
+
+        /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
@@ -118,6 +123,8 @@ Rho: {_rho}");
             {"Compounding Annual Return", "0%"},
             {"Drawdown", "0%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "100000"},
             {"Net Profit", "0%"},
             {"Sharpe Ratio", "0"},
             {"Sortino Ratio", "0"},
@@ -129,8 +136,8 @@ Rho: {_rho}");
             {"Beta", "0"},
             {"Annual Standard Deviation", "0"},
             {"Annual Variance", "0"},
-            {"Information Ratio", "0"},
-            {"Tracking Error", "0"},
+            {"Information Ratio", "-11.639"},
+            {"Tracking Error", "0.037"},
             {"Treynor Ratio", "0"},
             {"Total Fees", "$0.00"},
             {"Estimated Strategy Capacity", "$0"},
@@ -143,7 +150,7 @@ Rho: {_rho}");
     public class CustomImpliedVolatility : ImpliedVolatility
     {
         public CustomImpliedVolatility(Symbol option, Symbol mirrorOption, IRiskFreeInterestRateModel riskFreeRateModel, IDividendYieldModel dividendYieldModel)
-            : base(option, riskFreeRateModel, dividendYieldModel, mirrorOption, period: 2)
+            : base(option, riskFreeRateModel, dividendYieldModel, mirrorOption)
         {
             SetSmoothingFunction((iv, mirrorIV) => iv);
         }

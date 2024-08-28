@@ -31,8 +31,10 @@ namespace QuantConnect.Data
     /// </summary>
     public class SubscriptionManager
     {
-        private readonly PriorityQueue<ConsolidatorWrapper, DateTime> _consolidatorsSortedByScanTime;
+        private readonly PriorityQueue<ConsolidatorWrapper, ConsolidatorScanPriority> _consolidatorsSortedByScanTime;
         private readonly Dictionary<IDataConsolidator, ConsolidatorWrapper> _consolidators;
+        private List<Tuple<ConsolidatorWrapper, ConsolidatorScanPriority>> _consolidatorsToAdd;
+        private readonly object _threadSafeCollectionLock;
         private readonly ITimeKeeper _timeKeeper;
         private IAlgorithmSubscriptionManager _subscriptionManager;
 
@@ -65,6 +67,7 @@ namespace QuantConnect.Data
             _consolidators = new();
             _timeKeeper = timeKeeper;
             _consolidatorsSortedByScanTime = new(1000);
+            _threadSafeCollectionLock = new object();
         }
 
         /// <summary>
@@ -153,7 +156,6 @@ namespace QuantConnect.Data
                 dataNormalizationMode).First();
         }
 
-
         /// <summary>
         /// Add a consolidator for the symbol
         /// </summary>
@@ -182,7 +184,11 @@ namespace QuantConnect.Data
                     var wrapper = _consolidators[consolidator] =
                         new ConsolidatorWrapper(consolidator, subscription.Increment, _timeKeeper, _timeKeeper.GetLocalTimeKeeper(subscription.ExchangeTimeZone));
 
-                    _consolidatorsSortedByScanTime.Enqueue(wrapper, wrapper.UtcScanTime);
+                    lock (_threadSafeCollectionLock)
+                    {
+                        _consolidatorsToAdd ??= new();
+                        _consolidatorsToAdd.Add(new(wrapper, wrapper.Priority));
+                    }
                     return;
                 }
             }
@@ -228,6 +234,7 @@ namespace QuantConnect.Data
             foreach (var subscription in _subscriptionManager.GetSubscriptionDataConfigs(symbol))
             {
                 subscription.Consolidators.Remove(consolidator);
+
                 if (_consolidators.Remove(consolidator, out var consolidatorsToScan))
                 {
                     consolidatorsToScan.Dispose();
@@ -239,13 +246,37 @@ namespace QuantConnect.Data
         }
 
         /// <summary>
+        /// Removes the specified python consolidator for the symbol
+        /// </summary>
+        /// <param name="symbol">The symbol the consolidator is receiving data from</param>
+        /// <param name="pyConsolidator">The python consolidator instance to be removed</param>
+        public void RemoveConsolidator(Symbol symbol, PyObject pyConsolidator)
+        {
+            if (!pyConsolidator.TryConvert(out IDataConsolidator consolidator))
+            {
+                consolidator = new DataConsolidatorPythonWrapper(pyConsolidator);
+            }
+
+            RemoveConsolidator(symbol, consolidator);
+        }
+
+        /// <summary>
         /// Will trigger past consolidator scans
         /// </summary>
         /// <param name="newUtcTime">The new utc time</param>
         /// <param name="algorithm">The algorithm instance</param>
         public void ScanPastConsolidators(DateTime newUtcTime, IAlgorithm algorithm)
         {
-            while (_consolidatorsSortedByScanTime.TryPeek(out _, out var utcScanTime) && utcScanTime < newUtcTime)
+            if (_consolidatorsToAdd != null)
+            {
+                lock (_threadSafeCollectionLock)
+                {
+                    _consolidatorsToAdd.DoForEach(x => _consolidatorsSortedByScanTime.Enqueue(x.Item1, x.Item2));
+                    _consolidatorsToAdd = null;
+                }
+            }
+
+            while (_consolidatorsSortedByScanTime.TryPeek(out _, out var priority) && priority.UtcScanTime < newUtcTime)
             {
                 var consolidatorToScan = _consolidatorsSortedByScanTime.Dequeue();
                 if (consolidatorToScan.Disposed)
@@ -254,19 +285,19 @@ namespace QuantConnect.Data
                     continue;
                 }
 
-                if (utcScanTime != algorithm.UtcTime)
+                if (priority.UtcScanTime != algorithm.UtcTime)
                 {
                     // only update the algorithm time once, it's not cheap because of TZ conversions
-                    algorithm.SetDateTime(utcScanTime);
+                    algorithm.SetDateTime(priority.UtcScanTime);
                 }
 
-                if (consolidatorToScan.UtcScanTime <= utcScanTime)
+                if (consolidatorToScan.UtcScanTime <= priority.UtcScanTime)
                 {
                     // only scan if we still need to
                     consolidatorToScan.Scan();
                 }
 
-                _consolidatorsSortedByScanTime.Enqueue(consolidatorToScan, consolidatorToScan.UtcScanTime);
+                _consolidatorsSortedByScanTime.Enqueue(consolidatorToScan, consolidatorToScan.Priority);
             }
         }
 

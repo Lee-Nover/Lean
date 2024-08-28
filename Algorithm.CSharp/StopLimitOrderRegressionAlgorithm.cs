@@ -92,7 +92,7 @@ namespace QuantConnect.Algorithm.CSharp
                 var order = Transactions.GetOrderById(orderEvent.OrderId);
                 if (!((StopLimitOrder)order).StopTriggered)
                 {
-                    throw new Exception("StopLimitOrder StopTriggered should haven been set if the order filled.");
+                    throw new RegressionTestException("StopLimitOrder StopTriggered should haven been set if the order filled.");
                 }
 
                 if (orderEvent.Direction == OrderDirection.Buy)
@@ -100,7 +100,7 @@ namespace QuantConnect.Algorithm.CSharp
                     var limitPrice = _buyOrderTicket.Get(OrderField.LimitPrice);
                     if (orderEvent.FillPrice > limitPrice)
                     {
-                        throw new Exception($@"Buy stop limit order should have filled with price less than or equal to the limit price {
+                        throw new RegressionTestException($@"Buy stop limit order should have filled with price less than or equal to the limit price {
                             limitPrice}. Fill price: {orderEvent.FillPrice}");
                     }
                 }
@@ -109,7 +109,7 @@ namespace QuantConnect.Algorithm.CSharp
                     var limitPrice = _sellOrderTicket.Get(OrderField.LimitPrice);
                     if (orderEvent.FillPrice < limitPrice)
                     {
-                        throw new Exception($@"Sell stop limit order should have filled with price greater than or equal to the limit price {
+                        throw new RegressionTestException($@"Sell stop limit order should have filled with price greater than or equal to the limit price {
                             limitPrice}. Fill price: {orderEvent.FillPrice}");
                     }
                 }
@@ -120,12 +120,12 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (_buyOrderTicket == null || _sellOrderTicket == null)
             {
-                throw new Exception("Expected two orders (buy and sell) to have been filled at the end of the algorithm.");
+                throw new RegressionTestException("Expected two orders (buy and sell) to have been filled at the end of the algorithm.");
             }
 
             if (_buyOrderTicket.Status != OrderStatus.Filled || _sellOrderTicket.Status != OrderStatus.Filled)
             {
-                throw new Exception("Expected the two orders (buy and sell) to have been filled at the end of the algorithm.");
+                throw new RegressionTestException("Expected the two orders (buy and sell) to have been filled at the end of the algorithm.");
             }
         }
 
@@ -137,12 +137,12 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 8062;
+        public long DataPoints => 8061;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -150,20 +150,27 @@ namespace QuantConnect.Algorithm.CSharp
         public int AlgorithmHistoryDataPoints => 0;
 
         /// <summary>
+        /// Final status of the algorithm
+        /// </summary>
+        public AlgorithmStatus AlgorithmStatus => AlgorithmStatus.Completed;
+
+        /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
             {"Total Orders", "2"},
-            {"Average Win", "1.44%"},
+            {"Average Win", "1.28%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "0.359%"},
+            {"Compounding Annual Return", "0.318%"},
             {"Drawdown", "1.500%"},
             {"Expectancy", "0"},
-            {"Net Profit", "1.445%"},
-            {"Sharpe Ratio", "-0.749"},
-            {"Sortino Ratio", "-0.414"},
-            {"Probabilistic Sharpe Ratio", "5.635%"},
+            {"Start Equity", "100000"},
+            {"End Equity", "101277.61"},
+            {"Net Profit", "1.278%"},
+            {"Sharpe Ratio", "-0.791"},
+            {"Sortino Ratio", "-0.433"},
+            {"Probabilistic Sharpe Ratio", "4.702%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
@@ -171,14 +178,14 @@ namespace QuantConnect.Algorithm.CSharp
             {"Beta", "0.03"},
             {"Annual Standard Deviation", "0.008"},
             {"Annual Variance", "0"},
-            {"Information Ratio", "-0.96"},
+            {"Information Ratio", "-0.963"},
             {"Tracking Error", "0.104"},
-            {"Treynor Ratio", "-0.188"},
+            {"Treynor Ratio", "-0.199"},
             {"Total Fees", "$2.00"},
-            {"Estimated Strategy Capacity", "$2700000000.00"},
+            {"Estimated Strategy Capacity", "$6100000000.00"},
             {"Lowest Capacity Asset", "SPY R735QTJ8XC9X"},
             {"Portfolio Turnover", "0.02%"},
-            {"OrderListHash", "ebb6f711f14449c0cf8dcee645b34956"}
+            {"OrderListHash", "f315858f3f9e6a983cfcf887237f70fd"}
         };
     }
 }

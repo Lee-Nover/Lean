@@ -26,7 +26,7 @@ namespace QuantConnect.Indicators
         /// <summary>
         /// Option's symbol object
         /// </summary>
-        protected readonly Symbol _optionSymbol;
+        public Symbol OptionSymbol { get; init; }
 
         /// <summary>
         /// Mirror option symbol (by option right), for implied volatility
@@ -36,42 +36,42 @@ namespace QuantConnect.Indicators
         /// <summary>
         /// Underlying security's symbol object
         /// </summary>
-        protected Symbol _underlyingSymbol => _optionSymbol.Underlying;
+        protected Symbol _underlyingSymbol => OptionSymbol.Underlying;
 
         /// <summary>
         /// Option pricing model used to calculate indicator
         /// </summary>
-        protected OptionPricingModelType _optionModel;
+        protected OptionPricingModelType _optionModel { get; set; }
 
         /// <summary>
         /// Risk-free rate model
         /// </summary>
-        protected readonly IRiskFreeInterestRateModel _riskFreeInterestRateModel;
+        protected IRiskFreeInterestRateModel _riskFreeInterestRateModel { get; init; }
 
         /// <summary>
         /// Dividend yield model, for continuous dividend yield
         /// </summary>
-        protected readonly IDividendYieldModel _dividendYieldModel;
+        protected IDividendYieldModel _dividendYieldModel { get; init; }
 
         /// <summary>
         /// Gets the expiration time of the option
         /// </summary>
-        public DateTime Expiry => _optionSymbol.ID.Date;
+        public DateTime Expiry => OptionSymbol.ID.Date;
 
         /// <summary>
         /// Gets the option right (call/put) of the option
         /// </summary>
-        public OptionRight Right => _optionSymbol.ID.OptionRight;
+        public OptionRight Right => OptionSymbol.ID.OptionRight;
 
         /// <summary>
         /// Gets the strike price of the option
         /// </summary>
-        public decimal Strike => _optionSymbol.ID.StrikePrice;
+        public decimal Strike => OptionSymbol.ID.StrikePrice;
 
         /// <summary>
         /// Gets the option style (European/American) of the option
         /// </summary>
-        public OptionStyle Style => _optionSymbol.ID.OptionStyle;
+        public OptionStyle Style => OptionSymbol.ID.OptionStyle;
 
         /// <summary>
         /// Risk Free Rate
@@ -113,8 +113,8 @@ namespace QuantConnect.Indicators
         /// <param name="mirrorOption">The mirror option for parity calculation</param>
         /// <param name="period">The lookback period of volatility</param>
         /// <param name="optionModel">The option pricing model used to estimate the Greek/IV</param>
-        protected OptionIndicatorBase(string name, Symbol option, IRiskFreeInterestRateModel riskFreeRateModel, IDividendYieldModel dividendYieldModel, 
-            Symbol mirrorOption = null, OptionPricingModelType optionModel = OptionPricingModelType.BlackScholes, int period = 2)
+        protected OptionIndicatorBase(string name, Symbol option, IRiskFreeInterestRateModel riskFreeRateModel, IDividendYieldModel dividendYieldModel,
+            Symbol mirrorOption = null, OptionPricingModelType? optionModel = null, int period = 2)
             : base(name)
         {
             var sid = option.ID;
@@ -123,10 +123,10 @@ namespace QuantConnect.Indicators
                 throw new ArgumentException("OptionIndicatorBase only support SecurityType.Option.");
             }
 
-            _optionSymbol = option;
+            OptionSymbol = option;
             _riskFreeInterestRateModel = riskFreeRateModel;
             _dividendYieldModel = dividendYieldModel;
-            _optionModel = optionModel;
+            _optionModel = optionModel ?? GetOptionModel(optionModel, sid.OptionStyle);
 
             RiskFreeRate = new Identity(name + "_RiskFreeRate");
             DividendYield = new Identity(name + "_DividendYield");
@@ -162,6 +162,28 @@ namespace QuantConnect.Indicators
             {
                 OppositePrice.Reset();
             }
+        }
+
+        /// <summary>
+        /// Gets the option pricing model based on the option style, if not specified
+        /// </summary>
+        /// <param name="optionModel">The optional option pricing model, which will be returned if not null</param>
+        /// <param name="optionStyle">The option style</param>
+        /// <returns>The option pricing model based on the option style, if not specified</returns>
+        public static OptionPricingModelType GetOptionModel(OptionPricingModelType? optionModel, OptionStyle optionStyle)
+        {
+            if (optionModel.HasValue)
+            {
+                return optionModel.Value;
+            }
+
+            // Default values depend on the option style
+            return optionStyle switch
+            {
+                OptionStyle.European => OptionPricingModelType.BlackScholes,
+                OptionStyle.American => OptionPricingModelType.ForwardTree,
+                _ => throw new ArgumentOutOfRangeException(nameof(optionStyle), optionStyle, null)
+            };
         }
     }
 }

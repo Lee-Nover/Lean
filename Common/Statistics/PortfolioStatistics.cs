@@ -19,7 +19,6 @@ using System.Linq;
 using MathNet.Numerics.Distributions;
 using MathNet.Numerics.Statistics;
 using Newtonsoft.Json;
-using QLNet;
 using QuantConnect.Data;
 using QuantConnect.Util;
 
@@ -68,6 +67,18 @@ namespace QuantConnect.Statistics
         /// </summary>
         [JsonConverter(typeof(JsonRoundingConverter))]
         public decimal Expectancy { get; set; }
+
+        /// <summary>
+        /// Initial Equity Total Value
+        /// </summary>
+        [JsonConverter(typeof(JsonRoundingConverter))]
+        public decimal StartEquity { get; set; }
+
+        /// <summary>
+        /// Final Equity Total Value
+        /// </summary>
+        [JsonConverter(typeof(JsonRoundingConverter))]
+        public decimal EndEquity { get; set; }
 
         /// <summary>
         /// Annual compounded returns statistic based on the final-starting capital and years.
@@ -202,6 +213,9 @@ namespace QuantConnect.Statistics
             int? winCount = null,
             int? lossCount = null)
         {
+            StartEquity = startingCapital;
+            EndEquity = equity.LastOrDefault().Value;
+
             if (portfolioTurnover.Count > 0)
             {
                 PortfolioTurnover = portfolioTurnover.Select(kvp => kvp.Value).Average();
@@ -284,9 +298,9 @@ namespace QuantConnect.Statistics
 
             TrackingError = (decimal)Statistics.TrackingError(listPerformance, listBenchmark, (double)tradingDaysPerYear);
 
-            InformationRatio = TrackingError == 0 ? 0 : (annualPerformance - benchmarkAnnualPerformance) / TrackingError;
+            InformationRatio = TrackingError == 0 ? 0 : Extensions.SafeDecimalCast((double)annualPerformance - (double)benchmarkAnnualPerformance).SafeDivision(TrackingError);
 
-            TreynorRatio = Beta == 0 ? 0 : (annualPerformance - riskFreeRate) / Beta;
+            TreynorRatio = Beta == 0 ? 0 : Extensions.SafeDecimalCast((double)annualPerformance - (double)riskFreeRate).SafeDivision(Beta);
 
             // deannualize a 1 sharpe ratio
             var benchmarkSharpeRatio = 1.0d / Math.Sqrt(tradingDaysPerYear);
@@ -334,7 +348,29 @@ namespace QuantConnect.Statistics
         /// <returns>Double annual performance percentage</returns>
         private static decimal GetAnnualPerformance(List<double> performance, int tradingDaysPerYear)
         {
-            return Statistics.AnnualPerformance(performance, tradingDaysPerYear).SafeDecimalCast();
+            try
+            {
+                return Statistics.AnnualPerformance(performance, tradingDaysPerYear).SafeDecimalCast();
+            }
+            catch (ArgumentException ex)
+            {
+                var partialSums = 0.0;
+                var points = 0;
+                double troublePoint = default;
+                foreach(var point in performance)
+                {
+                    points++;
+                    partialSums += point;
+                    if (Math.Pow(partialSums / points, tradingDaysPerYear).IsNaNOrInfinity())
+                    {
+                        troublePoint = point;
+                        break;
+                    }
+                }
+
+                throw new ArgumentException($"PortfolioStatistics.GetAnnualPerformance(): An exception was thrown when trying to cast the annual performance value due to the following performance point: {troublePoint}. " +
+                    $"The exception thrown was the following: {ex.Message}.");
+            }
         }
 
         private static decimal GetValueAtRisk(

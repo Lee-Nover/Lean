@@ -17,6 +17,7 @@ using System;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using QuantConnect.Orders.Fills;
+using QuantConnect.Configuration;
 
 namespace QuantConnect
 {
@@ -25,6 +26,14 @@ namespace QuantConnect
     /// </summary>
     public class AlgorithmSettings : IAlgorithmSettings
     {
+        private static TimeSpan _defaultDatabasesRefreshPeriod =
+            TimeSpan.TryParse(Config.Get("databases-refresh-period", "1.00:00:00"), out var refreshPeriod) ? refreshPeriod : Time.OneDay;
+
+        /// <summary>
+        /// Gets whether or not WarmUpIndicator is allowed to warm up indicators
+        /// </summary>
+        public bool AutomaticIndicatorWarmUp { get; set; }
+
         /// <summary>
         /// True if should rebalance portfolio on security changes. True by default
         /// </summary>
@@ -122,7 +131,7 @@ namespace QuantConnect
         /// <summary>
         /// Number of trading days per year for this Algorithm's portfolio statistics.
         /// </summary>
-        /// <remarks>Effect on 
+        /// <remarks>Effect on
         /// <see cref="Statistics.PortfolioStatistics.AnnualVariance"/>,
         /// <seealso cref="Statistics.PortfolioStatistics.AnnualStandardDeviation"/>,
         /// <seealso cref="Statistics.PortfolioStatistics.SharpeRatio"/>,
@@ -133,11 +142,22 @@ namespace QuantConnect
         public int? TradingDaysPerYear { get; set; }
 
         /// <summary>
+        /// True if daily strict end times are enabled
+        /// </summary>
+        public bool DailyPreciseEndTime { get; set; }
+
+        /// <summary>
+        /// Gets the time span used to refresh the market hours and symbol properties databases
+        /// </summary>
+        public TimeSpan DatabasesRefreshPeriod { get; set; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="AlgorithmSettings"/> class
         /// </summary>
         public AlgorithmSettings()
         {
             LiquidateEnabled = true;
+            DailyPreciseEndTime = true;
             FreePortfolioValuePercentage = 0.0025m;
             // Because the free portfolio value has a trailing behavior by default, let's add a default minimum order margin portfolio percentage
             // to avoid tiny trades when rebalancing, defaulting to 0.1% of the TPV
@@ -145,6 +165,7 @@ namespace QuantConnect
             StalePriceTimeSpan = Time.OneHour;
             MaxAbsolutePortfolioTargetPercentage = 1000000000;
             MinAbsolutePortfolioTargetPercentage = 0.0000000001m;
+            DatabasesRefreshPeriod = _defaultDatabasesRefreshPeriod;
         }
     }
 }

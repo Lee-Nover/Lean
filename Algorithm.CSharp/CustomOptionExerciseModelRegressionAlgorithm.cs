@@ -60,7 +60,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
-        public override Language[] Languages { get; } = { Language.CSharp, Language.Python };
+        public override List<Language> Languages { get; } = new() { Language.CSharp, Language.Python };
 
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
@@ -73,6 +73,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Compounding Annual Return", "26116903817855100000000000000%"},
             {"Drawdown", "0.500%"},
             {"Expectancy", "0"},
+            {"Start Equity", "100000"},
+            {"End Equity", "257114"},
             {"Net Profit", "157.114%"},
             {"Sharpe Ratio", "107.743"},
             {"Sortino Ratio", "0"},
@@ -91,7 +93,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Estimated Strategy Capacity", "$87000.00"},
             {"Lowest Capacity Asset", "GOOCV 305RBQ20WHPNQ|GOOCV VP83T1ZUHROL"},
             {"Portfolio Turnover", "10.93%"},
-            {"OrderListHash", "f3584e74d78b3fa544f7558bb3c4c1bd"}
+            {"OrderListHash", "3c5f9544f697725475491434f18803e6"}
         };
     }
 }
