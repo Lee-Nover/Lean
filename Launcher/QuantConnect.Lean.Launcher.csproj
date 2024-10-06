@@ -59,6 +59,7 @@
     <ProjectReference Include="..\Messaging\QuantConnect.Messaging.csproj" />
     <ProjectReference Include="..\Queues\QuantConnect.Queues.csproj" />
     <ProjectReference Include="..\ToolBox\QuantConnect.ToolBox.csproj" />
+    <ProjectReference Include="..\..\Lean.Brokerages.PulseChain\QuantConnect.PulseChainBrokerage\QuantConnect.PulseChainBrokerage.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\LICENSE">

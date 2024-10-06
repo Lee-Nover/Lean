@@ -8843,6 +8843,11 @@ bybit,ZRXUSDT,cryptofuture,ZRXUSDT,USDT,1,0.0001,1,ZRXUSDT,1
 
 #market,symbol,type,description,quote_currency,contract_multiplier,minimum_price_variation,lot_size,market_ticker,minimum_order_size,price_magnifier
 pulsechain,DAIUSD,crypto,Dai-US Dollar,USD,1,0.0001,0.00001,DAI-USD
-pulsechain,WPLSDAI,crypto,PLS DAI,DAI,1,0.0000001,1,WPLS-DAI
-pulsechain,WPLSUSD,crypto,PLS USD,USD,1,0.0000001,1,WPLS-USD
-pulsechain,PDAIWPLS,crypto,pDAI PLS,WPLS,1,0.0000001,0.00001,PDAI-WPLS
+pulsechain,PLSDAI,crypto,PLS DAI,DAI,1,0.0000001,1,WPLS-DAI
+#pulsechain,PLSUSD,crypto,PLS USD,USD,1,0.0000001,1,WPLS-USD
+pulsechain,PLSUSD,crypto,PLS USD,USD,1,0.0000001,1,0xA1077a294dDE1B09bB078844df40758a5D0f9a27
+pulsechain,PLSUSDC,crypto,PLS USDC,USDC,1,0.0000001,1,PLS-USDC
+#pulsechain,PDAIPLS,crypto,pDAI PLS,PLS,1,0.0000001,0.00001,PDAI-WPLS
+pulsechain,PDAIPLS,crypto,pDAI PLS,PLS,1,0.0000001,0.00001,0x6B175474E89094C44Da98b954EedeAC495271d0F
+pulsechain,BEARPLS,crypto,Bear PLS,PLS,1,0.0000001,0.00001,BEAR-WPLS
+pulsechain,HEXPLS,crypto,HEX PLS,PLS,1,0.0000001,0.00001,HEX-WPLS

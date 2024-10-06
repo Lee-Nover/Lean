@@ -50,37 +50,50 @@ namespace QuantConnect.Algorithm.CSharp
 {
     public class PulsechainRQRAlgorithm : QCAlgorithm
     {
-        private Crypto crypto;
-        private Symbol symbol;
-        private RationalQuadraticRegression rqr;
+        private Crypto cryptoOtherMain;
+        private Crypto cryptoMainUSD;
+        private Symbol symbolOtherMain;
+        private Symbol symbolMainUSD;
+        private RationalQuadraticRegression rqrOtherMain;
+        private RationalQuadraticRegression rqrMainUSD;
         private bool wasBullish;
         private bool wasBearish;
-
-        const string MAIN = "WPLS";
-        const string OTHER = "PDAI";
-        const string PAIR = OTHER + MAIN;
-        const decimal MAIN_RESERVE = 100000m;
-        const decimal OTHER_RESERVE = 0m;
+        private string MARKET = "pulsechain";
+        private string MAIN = "PLS";
+        private string OTHER = "PDAI";
+        private string PairOtherMain;
+        private string PairMainUSD;
+        decimal MAIN_RESERVE = 100000m;
+        decimal OTHER_RESERVE = 0m;
         public override void Initialize()
         {
-            // Locally Lean installs free sample data, to download more data please visit https://www.quantconnect.com/docs/v2/lean-cli/datasets/downloading-data
-            // 20180405_trade
-            
             SetStartDate(2024, 02, 02);
             SetEndDate(2024, 03, 14);
             
             SetBrokerageModel(BrokerageName.Default, AccountType.Cash);
             
-            SetAccountCurrency(MAIN);
-            Market.Add("pulsechain", 369);
-            crypto = AddCrypto(PAIR, Resolution.Hour, "pulsechain");
-            symbol = crypto.Symbol;
-            SetCash(MAIN, 2000000m);
-            SetCash(OTHER, 100000m);
+            MAIN = GetParameter("base-currency", MAIN);
+            OTHER = GetParameter("other-currency", OTHER);
+            MAIN_RESERVE = GetParameter("base-reserve", MAIN_RESERVE);
+            OTHER_RESERVE = GetParameter("other-reserve", OTHER_RESERVE);
+            MARKET = GetParameter("market", MARKET);
+
+            PairOtherMain = OTHER + MAIN;
+            PairMainUSD = MAIN + "USD";
+
+            cryptoOtherMain = AddCrypto(PairOtherMain, Resolution.Hour, MARKET);
+            cryptoMainUSD = AddCrypto(PairMainUSD, Resolution.Hour, MARKET);
+            symbolOtherMain = cryptoOtherMain.Symbol;
+            SetCash(MAIN, GetParameter("cash-main", 2000000m));
+            SetCash(OTHER, GetParameter("cash-other", 100000m));
+            var rqrPeriod = GetParameter("rqr-period", 10);
+            var rqrLookback = GetParameter("rqr-lookback", 10);
+            var rqrWeight = GetParameter("rqr-weight", 1.0);
             
-            rqr = new RationalQuadraticRegression(10, 10, 1);
-            string name = CreateIndicatorName(symbol, rqr.Name, null);
-            RegisterIndicator(symbol, rqr, null);
+            rqrOtherMain = new RationalQuadraticRegression(rqrPeriod, rqrLookback, rqrWeight);
+            rqrMainUSD = new RationalQuadraticRegression(rqrPeriod, rqrLookback, rqrWeight);
+            RegisterIndicator(symbolOtherMain, rqrOtherMain, null);
+            RegisterIndicator(cryptoMainUSD.Symbol, rqrMainUSD, null);
             SetWarmUp(10);
             
             /*var chart = new Chart("Price");
@@ -94,12 +107,12 @@ namespace QuantConnect.Algorithm.CSharp
         private void OnDataConsolidated(TradeBar bar)
         {
             return;
-            rqr.Update(Time, bar.Close);
-            if (!rqr.IsReady) return;
+            rqrOtherMain.Update(Time, bar.Close);
+            if (!rqrOtherMain.IsReady) return;
             
-            var price = Securities[PAIR].Price;
-            var isBullish = rqr[0].Value > rqr[1].Value;
-            var isBearish = rqr[0].Value < rqr[1].Value;
+            var price = Securities[PairOtherMain].Price;
+            var isBullish = rqrOtherMain[0].Value > rqrOtherMain[1].Value;
+            var isBearish = rqrOtherMain[0].Value < rqrOtherMain[1].Value;
             if (isBullish && !wasBullish && !Portfolio.Invested)
             {
                 var maxMain = Portfolio.CashBook[MAIN].Amount - MAIN_RESERVE;
@@ -107,14 +120,14 @@ namespace QuantConnect.Algorithm.CSharp
                 if (other > 0)
                 {
                     Log($"{Time}   Buying {other:F5} {OTHER} for {MAIN} {maxMain:F5}");
-                    Buy(PAIR, other);
+                    Buy(PairOtherMain, other);
                 }
             } else if (isBearish && !wasBearish && Portfolio.Invested) {
                 var maxOther = Portfolio.CashBook[OTHER].Amount - OTHER_RESERVE;
                 if (maxOther > 0)
                 {
                     Log($"{Time}   Selling {maxOther:F5} {OTHER} for {MAIN} {maxOther * price:F5}");
-                    Sell(PAIR, maxOther);
+                    Sell(PairOtherMain, maxOther);
                 }
             }
             wasBullish = isBullish;
@@ -126,9 +139,9 @@ namespace QuantConnect.Algorithm.CSharp
         public override void OnData(Slice data)
         {
             if (IsWarmingUp) return;
-            var price = crypto.Price;// Securities[PAIR].Price;
-            var isBullish = rqr[0].Value > rqr[1].Value;
-            var isBearish = rqr[0].Value < rqr[1].Value;
+            var price = cryptoOtherMain.Price;// Securities[PAIR].Price;
+            var isBullish = rqrOtherMain[0].Value > rqrOtherMain[1].Value;
+            var isBearish = rqrOtherMain[0].Value < rqrOtherMain[1].Value;
             var canBuy = Portfolio.CashBook[MAIN].Amount > MAIN_RESERVE;
             var canSell = Portfolio.CashBook[OTHER].Amount > OTHER_RESERVE;
             if (isBullish && !wasBullish && canBuy)
@@ -138,14 +151,14 @@ namespace QuantConnect.Algorithm.CSharp
                 if (other > 0)
                 {
                     Log($"{Time}   Buying {other:F5} {OTHER} for {MAIN} {maxMain:F5}");
-                    Buy(PAIR, other);
+                    Buy(PairOtherMain, other);
                 }
             } else if (isBearish && !wasBearish && canSell) {
                 var maxOther = Portfolio.CashBook[OTHER].Amount - OTHER_RESERVE;
                 if (maxOther > 0)
                 {
                     Log($"{Time}   Selling {maxOther:F5} {OTHER} for {MAIN} {maxOther * price:F5}");
-                    Sell(PAIR, maxOther);
+                    Sell(PairOtherMain, maxOther);
                 }
             }
             wasBullish = isBullish;
