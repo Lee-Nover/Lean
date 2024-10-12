@@ -498,7 +498,7 @@ namespace QuantConnect.Algorithm
             InitializeIndicator(indicator, resolution, selector, symbol);
             return indicator;
         }
-      
+
         /// <summary>
         /// Creates a new ChaikinMoneyFlow indicator.
         /// </summary>
@@ -3880,13 +3880,9 @@ namespace QuantConnect.Algorithm
             {
                 dividendYieldModel = new ConstantDividendYieldModel(dividendYield.Value);
             }
-            else if (symbol.ID.SecurityType == SecurityType.FutureOption || symbol.ID.SecurityType == SecurityType.IndexOption)
-            {
-                dividendYieldModel = new DividendYieldProvider();
-            }
             else
             {
-                dividendYieldModel = new DividendYieldProvider(symbol.Underlying);
+                dividendYieldModel = DividendYieldProvider.CreateForOption(symbol);
             }
 
             return name;
@@ -4008,7 +4004,9 @@ namespace QuantConnect.Algorithm
             indicator.Updated -= callback;
 
             return new IndicatorHistory(indicatorsDataPointsByTime, indicatorsDataPointPerProperty,
-                new Lazy<PyObject>(() => PandasConverter.GetIndicatorDataFrame(indicatorsDataPointPerProperty.Select(x => new KeyValuePair<string, List<IndicatorDataPoint>>(x.Name, x.Values)))));
+                new Lazy<PyObject>(
+                    () => PandasConverter.GetIndicatorDataFrame(indicatorsDataPointPerProperty.Select(x => new KeyValuePair<string, List<IndicatorDataPoint>>(x.Name, x.Values))),
+                    isThreadSafe: false));
         }
 
         private Type GetDataTypeFromSelector(Func<IBaseData, decimal> selector)

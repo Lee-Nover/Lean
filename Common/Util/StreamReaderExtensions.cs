@@ -14,10 +14,11 @@
 */
 
 using System;
-using System.Globalization;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Text;
+using System.Globalization;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 
 namespace QuantConnect.Util
 {
@@ -161,6 +162,8 @@ namespace QuantConnect.Util
             return isNegative ? result * -1 : result;
         }
 
+        private readonly static ConcurrentBag<StringBuilder> StringBuilders = new();
+
         /// <summary>
         /// Gets a string from a stream reader
         /// </summary>
@@ -170,20 +173,27 @@ namespace QuantConnect.Util
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static string GetString(this StreamReader stream, char delimiter = DefaultDelimiter)
         {
-            StringBuilder result = null;
-            var current = (char)stream.Read();
-
-            while (!(current == delimiter || current == '\n' || current == '\r' && (stream.Peek() != '\n' || stream.Read() == '\n') || current == NoMoreData))
+            if (!StringBuilders.TryTake(out var builder))
             {
-                if (result == null)
-                {
-                    result = new StringBuilder();
-                }
-                result.Append(current);
-                current = (char)stream.Read();
+                builder = new();
             }
 
-            return result == null ? string.Empty : result.ToString();
+            try
+            {
+                var current = (char)stream.Read();
+
+                while (!(current == delimiter || current == '\n' || current == '\r' && (stream.Peek() != '\n' || stream.Read() == '\n') || current == NoMoreData))
+                {
+                    builder.Append(current);
+                    current = (char)stream.Read();
+                }
+                return builder.ToString();
+            }
+            finally
+            {
+                builder.Clear();
+                StringBuilders.Add(builder);
+            }
         }
     }
 }

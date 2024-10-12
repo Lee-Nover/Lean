@@ -8,7 +8,7 @@
 
 [![Build Status](https://github.com/QuantConnect/Lean/workflows/Build%20%26%20Test%20Lean/badge.svg)](https://github.com/QuantConnect/Lean/actions?query=workflow%3A%22Build%20%26%20Test%20Lean%22) &nbsp;&nbsp;&nbsp; [![Regression Tests](https://github.com/QuantConnect/Lean/workflows/Regression%20Tests/badge.svg)](https://github.com/QuantConnect/Lean/actions?query=workflow%3A%22Regression%20Tests%22) &nbsp;&nbsp;&nbsp; [![LEAN Forum](https://img.shields.io/badge/debug-LEAN%20Forum-53c82b.svg)](https://www.quantconnect.com/forum/discussions/1/lean) &nbsp;&nbsp;&nbsp; [![Discord Chat](https://img.shields.io/badge/chat-Discord-53c82b.svg)](https://www.quantconnect.com/discord)
 
-
+ 
 [Lean Home][1] | [Documentation][2] | [Download Zip][3] | [Docker Hub][8] | [Nuget][9]
 
 #
@@ -126,18 +126,25 @@ cd Lean
 
 ### macOS 
 
-- Install [Visual Studio for Mac](https://www.visualstudio.com/vs/visual-studio-mac/)
-- Open `QuantConnect.Lean.sln` in Visual Studio
+NOTE: Visual Studio for Mac [has been discontinued](https://learn.microsoft.com/en-gb/visualstudio/releases/2022/what-happened-to-vs-for-mac), use Visual Studio Code instead
 
-Visual Studio will automatically start to restore the Nuget packages. If not, in the menu bar, click `Project > Restore NuGet Packages`.
-
-- In the menu bar, click `Run > Start Debugging`.
-
-Alternatively, run the compiled `dll` file. First, in the menu bar, click `Build > Build All`, then:
-```
-cd Lean/Launcher/bin/Debug
-dotnet QuantConnect.Lean.Launcher.dll
-```
+- Install [Visual Studio Code for Mac](https://code.visualstudio.com/download)
+- Install the [C# Dev Kit extension](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit)
+- Install [dotnet 6 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/6.0):
+- To build the solution, either:
+  - choose **Run Task** > **build** from the Panel task dropdown, or
+  - from the command line run
+    ```
+    dotnet build
+    ```
+- To run the solution, either:
+  - choose **Run and Debug** from the Activity Bar, then click **Launch**, or
+  - click F5, or
+  - from the command line run
+    ```
+    cd Launcher/bin/Debug
+    dotnet QuantConnect.Lean.Launcher.dll
+    ```
 
 ### Linux (Debian, Ubuntu)
 
