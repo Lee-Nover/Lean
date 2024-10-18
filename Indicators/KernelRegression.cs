@@ -91,6 +91,35 @@ namespace QuantConnect.Indicators
 
             return result;
         }
+
+        public static bool IsSignificantPriceChange(decimal diff, decimal previousValue, decimal theta)
+        {
+            return Math.Abs(diff) / previousValue > theta;
+        }
+
+        public bool IsBullish(decimal theta = 0m)
+        {
+            var diff = Current.Value - Previous.Value;
+            return diff > 0 && IsSignificantPriceChange(diff, Previous.Value, theta);
+        }
+
+        public bool IsBearish(decimal theta = 0m)
+        {
+            var diff = Current.Value - Previous.Value;
+            return diff < 0 && IsSignificantPriceChange(diff, Previous.Value, theta);
+        }
+
+        public bool WasBullish(int index, decimal theta = 0m)
+        {
+            var diff = this[index].Value - this[index - 1].Value;
+            return diff > 0 && IsSignificantPriceChange(diff, this[index - 1].Value, theta);
+        }
+
+        public bool WasBearish(int index, decimal theta = 0m)
+        {
+            var diff = this[index].Value - this[index - 1].Value;
+            return diff < 0 && IsSignificantPriceChange(diff, this[index - 1].Value, theta);
+        }
     }
 
     public class RationalQuadraticRegression : KernelRegressionBase

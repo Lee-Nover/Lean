@@ -1,50 +1,16 @@
 #region imports
-    using System;
-    using System.Collections;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Globalization;
-    using System.Drawing;
-    using QuantConnect;
-    using QuantConnect.Algorithm.Framework;
-    using QuantConnect.Algorithm.Framework.Selection;
-    using QuantConnect.Algorithm.Framework.Alphas;
-    using QuantConnect.Algorithm.Framework.Portfolio;
-    using QuantConnect.Algorithm.Framework.Execution;
-    using QuantConnect.Algorithm.Framework.Risk;
-    using QuantConnect.Parameters;
-    using QuantConnect.Benchmarks;
-    using QuantConnect.Brokerages;
-    using QuantConnect.Util;
-    using QuantConnect.Interfaces;
-    using QuantConnect.Algorithm;
-    using QuantConnect.Indicators;
-    using QuantConnect.Data;
-    using QuantConnect.Data.Consolidators;
-    using QuantConnect.Data.Custom;
-    using QuantConnect.DataSource;
-    using QuantConnect.Data.Fundamental;
-    using QuantConnect.Data.Market;
-    using QuantConnect.Data.UniverseSelection;
-    using QuantConnect.Notifications;
-    using QuantConnect.Orders;
-    using QuantConnect.Orders.Fees;
-    using QuantConnect.Orders.Fills;
-    using QuantConnect.Orders.Slippage;
-    using QuantConnect.Scheduling;
-    using QuantConnect.Securities;
-    using QuantConnect.Securities.Equity;
-    using QuantConnect.Securities.Future;
-    using QuantConnect.Securities.Option;
-    using QuantConnect.Securities.Forex;
-    using QuantConnect.Securities.Crypto;
-    using QuantConnect.Securities.Interfaces;
-    using QuantConnect.Storage;
-    using QCAlgorithmFramework = QuantConnect.Algorithm.QCAlgorithm;
-    using QCAlgorithmFrameworkBridge = QuantConnect.Algorithm.QCAlgorithm;
-using System.Xml;
-using QLNet;
-using QuantConnect.Securities.CurrencyConversion;
+using System;
+using QuantConnect.Brokerages;
+using QuantConnect.Indicators;
+using QuantConnect.Data;
+using QuantConnect.Data.Market;
+using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Securities;
+using QuantConnect.Securities.Crypto;
+using QuantConnect.Orders;
+using System.Linq;
+using System.Drawing;
+
 #endregion
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -63,9 +29,10 @@ namespace QuantConnect.Algorithm.CSharp
         private string OTHER = "PDAI";
         private string PairOtherMain;
         private string PairMainUSD;
+        private Cash cashMain;
+        private Cash cashOther;
         decimal MAIN_RESERVE = 100000m;
         decimal OTHER_RESERVE = 0m;
-        private bool consolidate = true;
         public override void Initialize()
         {
             SetStartDate(2024, 02, 02);
@@ -83,32 +50,41 @@ namespace QuantConnect.Algorithm.CSharp
             PairMainUSD = MAIN + "USD";
 
             UniverseSettings.Resolution = Resolution.Minute;
-            cryptoOtherMain = AddCrypto(PairOtherMain, consolidate ? Resolution.Minute : Resolution.Hour, MARKET);
-            cryptoMainUSD = AddCrypto(PairMainUSD, consolidate ? Resolution.Minute : Resolution.Hour, MARKET);
+            cryptoOtherMain = AddCrypto(PairOtherMain, Resolution.Minute, MARKET);
+            cryptoMainUSD = AddCrypto(PairMainUSD, Resolution.Minute, MARKET);
             symbolOtherMain = cryptoOtherMain.Symbol;
             symbolMainUSD = cryptoMainUSD.Symbol;
             SetBenchmark(symbolOtherMain);
             SetCash(MAIN, GetParameter("cash-main", 2000000m));
             SetCash(OTHER, GetParameter("cash-other", 100000m));
+            cashMain = Portfolio.CashBook[MAIN];
+            cashOther = Portfolio.CashBook[OTHER];
+            
             var rqrPeriod = GetParameter("rqr-period", 10);
             var rqrLookback = GetParameter("rqr-lookback", 10);
             var rqrWeight = GetParameter("rqr-weight", 1.0);
-            
+            var period = GetParameter("period", 5);
+            Transactions.MarketOrderFillTimeout = TimeSpan.FromMinutes(1);
             rqrOtherMain = new RationalQuadraticRegression(rqrPeriod, rqrLookback, rqrWeight);
             rqrMainUSD = new RationalQuadraticRegression(rqrPeriod, rqrLookback, rqrWeight);
+            rqrOtherMain.Window.Size = 5;
+            rqrMainUSD.Window.Size = 5;
             RegisterIndicator(symbolOtherMain, rqrOtherMain, null);
             RegisterIndicator(cryptoMainUSD.Symbol, rqrMainUSD, null);
             SetWarmUp(rqrPeriod + rqrLookback);
             
-            /*var chart = new Chart("Price");
+            var chart = new Chart("PriceChart");
             AddChart(chart);
-            chart.AddSeries(new Series(rqr.Name, SeriesType.Line, "$", Color.Orange));
-            chart.AddSeries(new CandlestickSeries(OTHER, OTHER));*/
-            if (consolidate)
-            {
-                Consolidate(cryptoMainUSD.Symbol, TimeSpan.FromMinutes(5), OnDataConsolidated);
-                Consolidate(cryptoOtherMain.Symbol, TimeSpan.FromMinutes(5), OnDataConsolidated);
-            }
+            var OtherMainCandleSeries = new CandlestickSeries(PairOtherMain, OTHER);
+            var rqrOtherMainLine = new Series(rqrOtherMain.Name, SeriesType.Line, "$", Color.Orange);
+            chart.AddSeries(new Series("Bullish", SeriesType.Scatter, "$", Color.Aqua, ScatterMarkerSymbol.Triangle));
+            chart.AddSeries(new Series("Bearish", SeriesType.Scatter, "$", Color.Purple, ScatterMarkerSymbol.TriangleDown));
+        
+            chart.AddSeries(OtherMainCandleSeries);
+            chart.AddSeries(rqrOtherMainLine);
+            PlotIndicator("PriceChart", rqrOtherMain);
+            Consolidate(cryptoMainUSD.Symbol, TimeSpan.FromMinutes(period), OnDataConsolidated);
+            Consolidate(cryptoOtherMain.Symbol, TimeSpan.FromMinutes(period), OnDataConsolidated);
         }
 
         private void OnDataConsolidated(TradeBar bar)
@@ -120,28 +96,41 @@ namespace QuantConnect.Algorithm.CSharp
             }
             
             rqrOtherMain.Update(Time, bar.Close);
-            if (IsWarmingUp || !rqrOtherMain.IsReady) return;
+
+            Plot("PriceChart", PairOtherMain, bar);
             
+
+            if (IsWarmingUp || !rqrOtherMain.IsReady) return;
+            OrderTicket order = null;
             var price = Securities[PairOtherMain].Price;
-            var isBullish = rqrOtherMain[0].Value > rqrOtherMain[1].Value;
-            var isBearish = rqrOtherMain[0].Value < rqrOtherMain[1].Value;
-            if (isBullish && !wasBullish && !Portfolio.Invested)
+            var isBullish = rqrOtherMain.IsBullish();
+            var isBearish = rqrOtherMain.IsBearish();
+            wasBullish = rqrOtherMain.WasBullish(1);
+            wasBearish = rqrOtherMain.WasBearish(1);
+            if (isBullish && wasBearish)
+                Plot("PriceChart", "Bullish", rqrOtherMain.Current.Value);
+            else if (isBearish && wasBullish)
+                Plot("PriceChart", "Bearish", rqrOtherMain.Current.Value);
+
+            if (isBullish && wasBullish)
             {
-                var maxMain = Portfolio.CashBook[MAIN].Amount - MAIN_RESERVE;
-                var other = maxMain / price;
+                var maxMain = Math.Truncate(cashMain.Amount - MAIN_RESERVE);
+                var other = Math.Truncate(maxMain / price);
                 if (other > 0)
                 {
-                    Log($"{Time}   Buying {other:F5} {OTHER} for {MAIN} {maxMain:F5}");
-                    Buy(PairOtherMain, other);
+                    Log($"Buying {other:F5} {OTHER} for {MAIN} {maxMain:F5} @ {price:F5}, RQR {rqrOtherMain[2].Value:F5} > {rqrOtherMain[1].Value:F5} > {rqrOtherMain[0].Value:F5}");
+                    order = Buy(PairOtherMain, other);
                 }
-            } else if (isBearish && !wasBearish && Portfolio.Invested) {
-                var maxOther = Portfolio.CashBook[OTHER].Amount - OTHER_RESERVE;
+            } else if (isBearish && wasBearish && cashOther.Amount > OTHER_RESERVE) {
+                var maxOther = Math.Truncate(cashOther.Amount - OTHER_RESERVE);
                 if (maxOther > 0)
                 {
-                    Log($"{Time}   Selling {maxOther:F5} {OTHER} for {MAIN} {maxOther * price:F5}");
-                    Sell(PairOtherMain, maxOther);
+                    Log($"Selling {maxOther:F5} {OTHER} for {MAIN} {maxOther * price:F5} @ {price:F5}, RQR {rqrOtherMain[2].Value:F5} > {rqrOtherMain[1].Value:F5} > {rqrOtherMain[0].Value:F5}");
+                    order = Sell(PairOtherMain, maxOther);
                 }
             }
+            //if (order != null && order.Status == Orders.OrderStatus.Invalid)
+            //    Error($"Order Invalid: {order.SubmitRequest.Response.ErrorMessage}");
             wasBullish = isBullish;
             wasBearish = isBearish;
         }
@@ -150,32 +139,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// Slice object keyed by symbol containing the stock data
         public override void OnData(Slice data)
         {
-            if (IsWarmingUp || consolidate) return;
-
-            var price = cryptoOtherMain.Price;// Securities[PAIR].Price;
-            var isBullish = rqrOtherMain[0].Value > rqrOtherMain[1].Value;
-            var isBearish = rqrOtherMain[0].Value < rqrOtherMain[1].Value;
-            var canBuy = Portfolio.CashBook[MAIN].Amount > MAIN_RESERVE;
-            var canSell = Portfolio.CashBook[OTHER].Amount > OTHER_RESERVE;
-            if (isBullish && !wasBullish && canBuy)
-            {
-                var maxMain = Portfolio.CashBook[MAIN].Amount - MAIN_RESERVE;
-                var other = maxMain / price;
-                if (other > 0)
-                {
-                    Log($"{Time}   Buying {other:F5} {OTHER} for {MAIN} {maxMain:F5}");
-                    Buy(PairOtherMain, other);
-                }
-            } else if (isBearish && !wasBearish && canSell) {
-                var maxOther = Portfolio.CashBook[OTHER].Amount - OTHER_RESERVE;
-                if (maxOther > 0)
-                {
-                    Log($"{Time}   Selling {maxOther:F5} {OTHER} for {MAIN} {maxOther * price:F5}");
-                    Sell(PairOtherMain, maxOther);
-                }
-            }
-            wasBullish = isBullish;
-            wasBearish = isBearish;
+            // all is handled in consolidated handler
         }
 
         public override void OnEndOfDay(Symbol symbol)
@@ -185,16 +149,14 @@ namespace QuantConnect.Algorithm.CSharp
             var lastData = (TradeBar)security?.GetLastData();
             if (lastData != null)
                 Plot("Price", symbol.Value, lastData);*/
-            Log($"{Time}   Portfolio {Portfolio.CashBook[OTHER].Amount:F5}");
+            Log($"EndOfDay {symbol.Value}: {Portfolio.CashBook[symbol]}");
         }
 
         public override void OnEndOfAlgorithm()
         {
             base.OnEndOfAlgorithm();
-            Log($"{Time} - TotalPortfolioValue: {Portfolio.TotalPortfolioValue}");
-            Log($"{Time} - CashBook: \r\n{Portfolio.CashBook}");
+            Log($"TotalPortfolioValue: {Portfolio.TotalPortfolioValue}");
+            Log($"Portfolio: \r\n{Portfolio.CashBook}");
         }
-
-        
     }
 }
