@@ -112,6 +112,7 @@ namespace QuantConnect.Algorithm.CSharp
             else if (isBearish && wasBullish)
                 Plot("PriceChart", "Bearish", rqrOtherMain.Current.Value);
 
+            Log($"{OTHER} @ {price:F5} {MAIN}, RQR {rqrOtherMain[2].Value:F5} > {rqrOtherMain[1].Value:F5} > {rqrOtherMain[0].Value:F5}");
             if (isBullish && wasBullish)
             {
                 var maxMain = Math.Truncate(cashMain.Amount - MAIN_RESERVE);
