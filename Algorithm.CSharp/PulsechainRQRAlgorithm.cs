@@ -113,7 +113,7 @@ namespace QuantConnect.Algorithm.CSharp
                 Plot("PriceChart", "Bearish", rqrOtherMain.Current.Value);
 
             Log($"{OTHER} @ {price:F5} {MAIN}, RQR {rqrOtherMain[2].Value:F5} > {rqrOtherMain[1].Value:F5} > {rqrOtherMain[0].Value:F5}");
-            if (isBullish && wasBullish)
+            if (isBullish && wasBullish && cashMain.Amount > MAIN_RESERVE)
             {
                 var maxMain = Math.Truncate(cashMain.Amount - MAIN_RESERVE);
                 var other = Math.Truncate(maxMain / price);
@@ -130,10 +130,6 @@ namespace QuantConnect.Algorithm.CSharp
                     order = Sell(PairOtherMain, maxOther);
                 }
             }
-            //if (order != null && order.Status == Orders.OrderStatus.Invalid)
-            //    Error($"Order Invalid: {order.SubmitRequest.Response.ErrorMessage}");
-            wasBullish = isBullish;
-            wasBearish = isBearish;
         }
 
         /// OnData event is the primary entry point for your algorithm. Each new data point will be pumped in here.

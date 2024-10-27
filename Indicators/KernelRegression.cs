@@ -111,14 +111,14 @@ namespace QuantConnect.Indicators
 
         public bool WasBullish(int index, decimal theta = 0m)
         {
-            var diff = this[index].Value - this[index - 1].Value;
-            return diff > 0 && IsSignificantPriceChange(diff, this[index - 1].Value, theta);
+            var diff = this[index].Value - this[index + 1].Value;
+            return diff > 0 && IsSignificantPriceChange(diff, this[index + 1].Value, theta);
         }
 
         public bool WasBearish(int index, decimal theta = 0m)
         {
-            var diff = this[index].Value - this[index - 1].Value;
-            return diff < 0 && IsSignificantPriceChange(diff, this[index - 1].Value, theta);
+            var diff = this[index].Value - this[index + 1].Value;
+            return diff < 0 && IsSignificantPriceChange(diff, this[index + 1].Value, theta);
         }
     }
 
