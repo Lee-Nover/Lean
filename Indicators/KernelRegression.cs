@@ -100,25 +100,25 @@ namespace QuantConnect.Indicators
         public bool IsBullish(decimal theta = 0m)
         {
             var diff = Current.Value - Previous.Value;
-            return diff > 0 && IsSignificantPriceChange(diff, Previous.Value, theta);
+            return diff > 0 && (theta == 0 || IsSignificantPriceChange(diff, Previous.Value, theta));
         }
 
         public bool IsBearish(decimal theta = 0m)
         {
             var diff = Current.Value - Previous.Value;
-            return diff < 0 && IsSignificantPriceChange(diff, Previous.Value, theta);
+            return diff < 0 && (theta == 0 || IsSignificantPriceChange(diff, Previous.Value, theta));
         }
 
         public bool WasBullish(int index, decimal theta = 0m)
         {
             var diff = this[index].Value - this[index + 1].Value;
-            return diff > 0 && IsSignificantPriceChange(diff, this[index + 1].Value, theta);
+            return diff > 0 && (theta == 0 || IsSignificantPriceChange(diff, this[index + 1].Value, theta));
         }
 
         public bool WasBearish(int index, decimal theta = 0m)
         {
             var diff = this[index].Value - this[index + 1].Value;
-            return diff < 0 && IsSignificantPriceChange(diff, this[index + 1].Value, theta);
+            return diff < 0 && (theta == 0 || IsSignificantPriceChange(diff, this[index + 1].Value, theta));
         }
     }
 
@@ -129,9 +129,19 @@ namespace QuantConnect.Indicators
         /// </summary>
         /// <param name="period">The period of the kernel regression</param>
         public RationalQuadraticRegression(int period, int lookback, double relativeWeight = 1.0)
-            : base($"RQR({period}, {lookback})", period)
+            : this($"RQR({period}, {lookback})", period, lookback, relativeWeight)
         {
-            this.weights = KernelFunctions.RationalQuadraticWeights(lookback, period, relativeWeight);
+            
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the RationalQuadraticRegression class with the default name and period
+        /// </summary>
+        /// <param name="period">The period of the kernel regression</param>
+        public RationalQuadraticRegression(string name, int period, int lookback, double relativeWeight = 1.0)
+            : base(name, period)
+        {
+            this.weights = KernelFunctions.RationalQuadraticWeights(Math.Max(lookback, period), period, relativeWeight);
         }
     }
 
@@ -144,7 +154,7 @@ namespace QuantConnect.Indicators
         public GaussianRegression(int period, int lookback)
             : base($"GR({period}, {lookback})", period)
         {
-            this.weights = KernelFunctions.GaussianWeights(lookback, period);
+            this.weights = KernelFunctions.GaussianWeights(Math.Max(lookback, period), period);
         }
     }
 
@@ -157,7 +167,7 @@ namespace QuantConnect.Indicators
         public PeriodicRegression(int period, int lookback, int periodicPeriod)
             : base($"PR({period}, {lookback})", period)
         {
-            this.weights = KernelFunctions.PeriodicWeights(lookback, period, periodicPeriod);
+            this.weights = KernelFunctions.PeriodicWeights(Math.Max(lookback, period), period, periodicPeriod);
         }
     }
 
@@ -170,7 +180,7 @@ namespace QuantConnect.Indicators
         public LocallyPeriodicRegression(int period, int lookback, int periodicPeriod)
             : base($"LPR({period}, {lookback})", period)
         {
-            this.weights = KernelFunctions.LocallyPeriodicWeights(lookback, period, periodicPeriod);
+            this.weights = KernelFunctions.LocallyPeriodicWeights(Math.Max(lookback, period), period, periodicPeriod);
         }
     }
 }

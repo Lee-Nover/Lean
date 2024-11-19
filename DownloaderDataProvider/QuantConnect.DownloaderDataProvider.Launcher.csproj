@@ -42,6 +42,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Lean.Brokerages.PulseChain\QuantConnect.PulseChainBrokerage.ToolBox\QuantConnect.PulseChainBrokerage.ToolBox.csproj" />
     <ProjectReference Include="..\Common\QuantConnect.csproj" />
     <ProjectReference Include="..\Configuration\QuantConnect.Configuration.csproj" />
     <ProjectReference Include="..\Engine\QuantConnect.Lean.Engine.csproj" />
