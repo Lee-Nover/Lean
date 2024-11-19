@@ -41,7 +41,14 @@ namespace QuantConnect.Tests.Algorithm
             var parameters = new HistoryProviderInitializeParameters(null, null, TestGlobals.DataProvider, TestGlobals.DataCacheProvider,
                 TestGlobals.MapFileProvider, TestGlobals.FactorFileProvider, (_) => { }, true, new DataPermissionManager(), null,
                 new AlgorithmSettings());
-            historyProvider.Initialize(parameters);
+            try
+            {
+                historyProvider.Initialize(parameters);
+            }
+            catch (InvalidOperationException)
+            {
+               // Already initialized
+            }
 
             _algorithm = new QCAlgorithm();
             _algorithm.SetHistoryProvider(historyProvider);
@@ -134,6 +141,21 @@ def get_option_chain_data_from_dataframe(algorithm, canonical):
             var optionContractsSymbols = _optionChainProvider.GetOptionContractList(symbol, date.Date).ToList();
 
             CollectionAssert.AreEquivalent(optionContractsSymbols, optionChain);
+        }
+
+        [Test]
+        public void IndexOptionChainApisAreConsistent()
+        {
+            var date = new DateTime(2015, 12, 24);
+            _algorithm.SetDateTime(date.ConvertToUtc(_algorithm.TimeZone));
+
+            var symbol = Symbols.SPX;
+            var exchange = MarketHoursDatabase.FromDataFolder().GetExchangeHours(symbol.ID.Market, symbol, symbol.SecurityType);
+
+            var chainFromAlgorithmApi = _algorithm.OptionChain(symbol).Select(x => x.Symbol).ToList();
+            var chainFromChainProviderApi = _optionChainProvider.GetOptionContractList(symbol, date.ConvertTo(_algorithm.TimeZone, exchange.TimeZone)).ToList();
+
+            CollectionAssert.AreEquivalent(chainFromAlgorithmApi, chainFromChainProviderApi);
         }
     }
 }
