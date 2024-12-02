@@ -191,7 +191,18 @@ namespace QuantConnect
                 return entry;
             }
 
-            return marketHoursDatabase.GetEntry(symbol.ID.Market, symbol, symbol.ID.SecurityType);
+            var result = marketHoursDatabase.GetEntry(symbol.ID.Market, symbol, symbol.ID.SecurityType);
+
+            // For the OptionUniverse type, the exchange and data time zones are set to the same value (exchange tz).
+            // This is not actual options data, just option chains/universe selection, so we don't want any offsets
+            // between the exchange and data time zones.
+            // If the MHDB were data type dependent as well, this would be taken care in there.
+            if (result != null && dataTypes.Any(dataType => dataType == typeof(OptionUniverse)))
+            {
+                result = new MarketHoursDatabase.Entry(result.ExchangeHours.TimeZone, result.ExchangeHours);
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -4122,7 +4133,12 @@ namespace QuantConnect
                 return (data as Delisting)?.Type == DelistingType.Delisted;
             }
 
-            if (!(type == typeof(Delisting) || type == typeof(Split) || type == typeof(Dividend)))
+            // We let delistings through. We need to emit delistings for all subscriptions, even internals like
+            // continuous futures mapped contracts. For instance, an algorithm might hold a position for a mapped
+            // contract and then the continuous future is mapped to a different contract. If the previously mapped
+            // contract is delisted, we need to let the delisting through so that positions are closed out and the
+            // security is removed from the algorithm and marked as delisted and non-tradable.
+            if (!(type == typeof(Split) || type == typeof(Dividend)))
             {
                 return true;
             }
