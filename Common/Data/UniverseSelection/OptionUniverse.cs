@@ -17,6 +17,7 @@ using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using QuantConnect.Data.Market;
+using QuantConnect.Python;
 using QuantConnect.Securities;
 using QuantConnect.Util;
 
@@ -35,11 +36,13 @@ namespace QuantConnect.Data.UniverseSelection
         /// <summary>
         /// The security identifier of the option symbol
         /// </summary>
+        [PandasIgnore]
         public SecurityIdentifier ID => Symbol.ID;
 
         /// <summary>
         /// Price of the option/underlying
         /// </summary>
+        [PandasIgnore]
         public override decimal Value => Close;
 
         /// <summary>
@@ -239,7 +242,7 @@ namespace QuantConnect.Data.UniverseSelection
                 CacheSymbol(key, symbol);
             }
 
-            return new OptionUniverse(date.ConvertTo(config.DataTimeZone, config.ExchangeTimeZone), symbol, remainingLine);
+            return new OptionUniverse(date, symbol, remainingLine);
         }
 
         /// <summary>
@@ -345,6 +348,7 @@ namespace QuantConnect.Data.UniverseSelection
 
             public override decimal Rho => _csvLine.GetDecimalFromCsv(StartingGreeksCsvIndex + 4);
 
+            [PandasIgnore]
             public override decimal Lambda => decimal.Zero;
 
             /// <summary>
