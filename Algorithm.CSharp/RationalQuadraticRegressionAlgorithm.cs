@@ -18,8 +18,8 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void Initialize()
         {
-            SetStartDate(2023, 1, 1);
-            SetEndDate(2023, 12, 31);
+            SetStartDate(2024, 11, 27);
+            SetEndDate(2024, 12, 02);
             SetCash(100000);
 
             symbol = AddCrypto("PDAIPLS", Resolution.Minute).Symbol;

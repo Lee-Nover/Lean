@@ -141,7 +141,7 @@ namespace QuantConnect.Indicators
         public RationalQuadraticRegression(string name, int period, int lookback, double relativeWeight = 1.0)
             : base(name, period)
         {
-            this.weights = KernelFunctions.RationalQuadraticWeights(Math.Max(lookback, period), period, relativeWeight);
+            this.weights = KernelFunctions.RationalQuadraticWeights(Math.Max(lookback, period), lookback, relativeWeight);
         }
     }
 
@@ -154,7 +154,7 @@ namespace QuantConnect.Indicators
         public GaussianRegression(int period, int lookback)
             : base($"GR({period}, {lookback})", period)
         {
-            this.weights = KernelFunctions.GaussianWeights(Math.Max(lookback, period), period);
+            this.weights = KernelFunctions.GaussianWeights(Math.Max(lookback, period), lookback);
         }
     }
 
@@ -167,7 +167,7 @@ namespace QuantConnect.Indicators
         public PeriodicRegression(int period, int lookback, int periodicPeriod)
             : base($"PR({period}, {lookback})", period)
         {
-            this.weights = KernelFunctions.PeriodicWeights(Math.Max(lookback, period), period, periodicPeriod);
+            this.weights = KernelFunctions.PeriodicWeights(Math.Max(lookback, period), lookback, periodicPeriod);
         }
     }
 
@@ -180,7 +180,7 @@ namespace QuantConnect.Indicators
         public LocallyPeriodicRegression(int period, int lookback, int periodicPeriod)
             : base($"LPR({period}, {lookback})", period)
         {
-            this.weights = KernelFunctions.LocallyPeriodicWeights(Math.Max(lookback, period), period, periodicPeriod);
+            this.weights = KernelFunctions.LocallyPeriodicWeights(Math.Max(lookback, period), lookback, periodicPeriod);
         }
     }
 }
