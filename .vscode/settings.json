@@ -4,5 +4,8 @@
         "/Lean/Algorithm.Python",
         "/opt/miniconda3/lib/python3.8/site-packages"
     ],
-    "files.autoSave": "afterDelay"
+    "files.autoSave": "afterDelay",
+    "files.associations": {
+        "*.yaml": "home-assistant"
+    }
 }

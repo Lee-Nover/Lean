@@ -2,7 +2,7 @@
   "profiles": {
     "QuantConnect.DownloaderDataProvider.Launcher": {
       "commandName": "Project",
-      "commandLineArgs": "--market \"pulsechain\" --data-type \"Trade\"  --resolution \"Hour\" --start-date \"20241110\" --end-date \"20241116\" --security-type \"Crypto\" --tickers \"PDAIPLS,PLSUSD\""
+      "commandLineArgs": "--market \"pulsechain\" --data-type \"Trade\"  --resolution \"Minute\" --start-date \"20241127\" --end-date \"20241201\" --security-type \"Crypto\" --tickers \"PDAIPLS,PLSUSD,wBTCPLS\""
     }
   }
 }

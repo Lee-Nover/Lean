@@ -34,10 +34,36 @@
             "internalConsoleOptions": "neverOpen"
         },
         {
+            "name": "Launch Backtest",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/Launcher/bin/Debug/QuantConnect.Lean.Launcher.dll",
+            "args": [
+                "--config",
+                "${workspaceFolder}/Launcher/config-backtest.json"
+            ],
+            "cwd": "${workspaceFolder}/Launcher/bin/Debug/",
+            "stopAtEntry": false,
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen"
+        },
+        {
+            "name": "Launch Optimizer",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/Optimizer.Launcher/bin/Debug/QuantConnect.Optimizer.Launcher.dll",
+            
+            "cwd": "${workspaceFolder}/Optimizer.Launcher/bin/Debug/",
+            "stopAtEntry": false,
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen"
+        },
+        {
             "name": "Attach to Python",
-            "type": "python",
+            "type": "debugpy",
             "request": "attach",
-            "port": 5678,
             "pathMappings":[{ 
                 "localRoot": "${workspaceFolder}", 
                 "remoteRoot": "${workspaceFolder}"
