@@ -222,17 +222,20 @@ namespace QuantConnect.Algorithm.CSharp
 
             Log($"{bar.EndTime.ToUniversalTime()} {OTHER} @ {price:F5} {MAIN}, RQR {rqrOtherMainFast[2].Value:F5} > {rqrOtherMainFast[1].Value:F5} > {rqrOtherMainFast[0].Value:F5}, RQR Slow {rqrOtherMainSlow[2].Value:F5} > {rqrOtherMainSlow[1].Value:F5} > {rqrOtherMainSlow[0].Value:F5}");
 
+            OrderTicket order = null;
             if (isFastRising && cashMain.Amount > (MAIN_RESERVE * 1.01m))
             {
                 // Fast Buy Signal
-                ExecuteTrade(true, cashMain.Amount, price, true, rqrOtherMainFast.Name);
-                currentPosition = PositionState.Long;
+                order = ExecuteTrade(true, cashMain.Amount, price, true, rqrOtherMainFast.Name);
+                if (order != null && order.Status == OrderStatus.Filled)
+                    currentPosition = PositionState.Long;
             }
             else if (isFastFalling && cashOther.Amount > (OTHER_RESERVE * 1.01m))
             {
                 // Fast Sell Signal
-                ExecuteTrade(false, cashOther.Amount, price, true, rqrOtherMainFast.Name);
-                currentPosition = PositionState.Short;
+                order = ExecuteTrade(false, cashOther.Amount, price, true, rqrOtherMainFast.Name);
+                if (order != null && order.Status == OrderStatus.Filled)
+                    currentPosition = PositionState.Short;
             }
             else if (isSlowRising && cashMain.Amount > (MAIN_RESERVE * 1.01m))
             {
@@ -240,8 +243,9 @@ namespace QuantConnect.Algorithm.CSharp
                 if (currentPosition != PositionState.Long && isRising)
                 {
                     Log($"DEBUG: Slow Buy - Position:{currentPosition}, FastDirection:{lastFastIndicatorDirection}");
-                    ExecuteTrade(true, cashMain.Amount, price, false, rqrOtherMainSlow.Name);
-                    currentPosition = PositionState.Long;
+                    order = ExecuteTrade(true, cashMain.Amount, price, false, rqrOtherMainSlow.Name);
+                    if (order != null && order.Status == OrderStatus.Filled)
+                        currentPosition = PositionState.Long;
                 }
                 else
                     Log($"DEBUG: Slow Buy Blocked - Position:{currentPosition}, FastDirection:{lastFastIndicatorDirection}, IsRising:{isRising}");
@@ -252,8 +256,9 @@ namespace QuantConnect.Algorithm.CSharp
                 if (currentPosition != PositionState.Short && isFalling)
                 {
                     Log($"DEBUG: Slow Sell - Position:{currentPosition}, FastDirection:{lastFastIndicatorDirection}");
-                    ExecuteTrade(false, cashOther.Amount, price, false, rqrOtherMainSlow.Name);
-                    currentPosition = PositionState.Short;
+                    order = ExecuteTrade(false, cashOther.Amount, price, false, rqrOtherMainSlow.Name);
+                    if (order != null && order.Status == OrderStatus.Filled)
+                        currentPosition = PositionState.Short;
                 }
                 else
                     Log($"DEBUG: Slow Sell Blocked - Position:{currentPosition}, FastDirection:{lastFastIndicatorDirection}, IsFalling:{isFalling}");
@@ -261,14 +266,16 @@ namespace QuantConnect.Algorithm.CSharp
             else if (isAverageRising && cashMain.Amount > (MAIN_RESERVE * 1.01m))
             {
                 // Fast Buy Signal
-                ExecuteTrade(true, cashMain.Amount, price, true, rqrOtherMainFast.Name  + rqrOtherMainSlow.Name);
-                currentPosition = PositionState.Long;
+                order = ExecuteTrade(true, cashMain.Amount, price, true, rqrOtherMainFast.Name  + rqrOtherMainSlow.Name);
+                if (order != null && order.Status == OrderStatus.Filled)
+                    currentPosition = PositionState.Long;
             }
             else if (isAverageFalling && cashOther.Amount > (OTHER_RESERVE * 1.01m))
             {
                 // Both indicators aggree
-                ExecuteTrade(false, cashOther.Amount, price, true, rqrOtherMainFast.Name + rqrOtherMainSlow.Name);
-                currentPosition = PositionState.Short;
+                order = ExecuteTrade(false, cashOther.Amount, price, true, rqrOtherMainFast.Name + rqrOtherMainSlow.Name);
+                if (order != null && order.Status == OrderStatus.Filled)
+                    currentPosition = PositionState.Short;
             }
 
             if (IsFastSlowCrossover())
