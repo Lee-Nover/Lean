@@ -1951,6 +1951,27 @@ namespace QuantConnect.Algorithm
             return sortinoRatio;
         }
 
+        /// <summary>
+        /// Creates a Squeeze Momentum indicator to identify market squeezes and potential breakouts.
+        /// Compares Bollinger Bands and Keltner Channels to signal low or high volatility periods.
+        /// </summary>
+        /// <param name="symbol">The symbol for which the indicator is calculated.</param>
+        /// <param name="bollingerPeriod">The period for Bollinger Bands.</param>
+        /// <param name="bollingerMultiplier">The multiplier for the Bollinger Bands' standard deviation.</param>
+        /// <param name="keltnerPeriod">The period for Keltner Channels.</param>
+        /// <param name="keltnerMultiplier">The multiplier for the Average True Range in Keltner Channels.</param>
+        /// <param name="resolution">The resolution of the data.</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator. If null, defaults to the Value property of BaseData (x => x.Value).</param>
+        /// <returns>The configured Squeeze Momentum indicator.</returns>
+        [DocumentationAttribute(Indicators)]
+        public SqueezeMomentum SM(Symbol symbol, int bollingerPeriod = 20, decimal bollingerMultiplier = 2m, int keltnerPeriod = 20,
+            decimal keltnerMultiplier = 1.5m, Resolution? resolution = null, Func<IBaseData, IBaseDataBar> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, $"SM({bollingerPeriod}, {bollingerMultiplier}, {keltnerPeriod}, {keltnerMultiplier})", resolution);
+            var squeezeMomentum = new SqueezeMomentum(name, bollingerPeriod, bollingerMultiplier, keltnerPeriod, keltnerMultiplier);
+            InitializeIndicator(squeezeMomentum, resolution, selector, symbol);
+            return squeezeMomentum;
+        }
 
         /// <summary>
         /// Creates an SimpleMovingAverage indicator for the symbol. The indicator will be automatically
@@ -2788,6 +2809,24 @@ namespace QuantConnect.Algorithm
             InitializeIndicator(zeroLagExponentialMovingAverage, resolution, selector, symbol);
 
             return zeroLagExponentialMovingAverage;
+        }
+
+        /// <summary>
+        /// Creates a ZigZag indicator for the specified symbol, with adjustable sensitivity and minimum trend length.
+        /// </summary>
+        /// <param name="symbol">The symbol for which to create the ZigZag indicator.</param>
+        /// <param name="sensitivity">The sensitivity for detecting pivots.</param>
+        /// <param name="minTrendLength">The minimum number of bars required for a trend before a pivot is confirmed.</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>The configured ZigZag indicator.</returns>
+        [DocumentationAttribute(Indicators)]
+        public ZigZag ZZ(Symbol symbol, decimal sensitivity = 0.05m, int minTrendLength = 1, Resolution? resolution = null, Func<IBaseData, IBaseDataBar> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, $"ZZ({sensitivity},{minTrendLength})", resolution);
+            var zigZag = new ZigZag(name, sensitivity, minTrendLength);
+            InitializeIndicator(zigZag, resolution, selector, symbol);
+            return zigZag;
         }
 
         /// <summary>
