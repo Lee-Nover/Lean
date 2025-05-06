@@ -58,6 +58,7 @@ using QuantConnect.Commands;
 using Newtonsoft.Json;
 using QuantConnect.Securities.Index;
 using QuantConnect.Api;
+using System.Threading.Tasks;
 
 namespace QuantConnect.Algorithm
 {
@@ -477,7 +478,7 @@ namespace QuantConnect.Algorithm
         /// </summary>
         [DocumentationAttribute(AddingData)]
         [Obsolete("OptionChainProvider property is will soon be deprecated. " +
-            "The new OptionChain() method should be used to fetch equity and index option chains, " +
+            "The new OptionChain() method should be used to fetch option chains, " +
             "which will contain additional data per contract, like daily price data, implied volatility and greeks.")]
         public IOptionChainProvider OptionChainProvider { get; private set; }
 
@@ -485,6 +486,9 @@ namespace QuantConnect.Algorithm
         /// Gets the future chain provider, used to get the list of future contracts for an underlying symbol
         /// </summary>
         [DocumentationAttribute(AddingData)]
+        [Obsolete("FutureChainProvider property is will soon be deprecated. " +
+            "The new FuturesChain() method should be used to fetch futures chains, " +
+            "which will contain additional data per contract, like daily price data.")]
         public IFutureChainProvider FutureChainProvider { get; private set; }
 
         /// <summary>
@@ -1135,6 +1139,7 @@ namespace QuantConnect.Algorithm
         /// and because Python does not support two methods with the same name</remarks>
         [Obsolete("This method is deprecated and will be removed after August 2021. Please use this overload: OnEndOfDay(Symbol symbol)")]
         [DocumentationAttribute(HandlingData)]
+        [StubsIgnore]
         public virtual void OnEndOfDay()
         {
 
@@ -1149,6 +1154,7 @@ namespace QuantConnect.Algorithm
         /// </remarks>
         /// <param name="symbol">Asset symbol for this end of day event. Forex and equities have different closing hours.</param>
         [DocumentationAttribute(HandlingData)]
+        [StubsIgnore]
         public virtual void OnEndOfDay(string symbol)
         {
         }
@@ -1158,6 +1164,7 @@ namespace QuantConnect.Algorithm
         /// </summary>
         /// <param name="symbol">Asset symbol for this end of day event. Forex and equities have different closing hours.</param>
         [DocumentationAttribute(HandlingData)]
+        [StubsAvoidImplicits]
         public virtual void OnEndOfDay(Symbol symbol)
         {
             OnEndOfDay(symbol.ToString());
@@ -1939,9 +1946,9 @@ namespace QuantConnect.Algorithm
 
             var securityResolution = resolution;
             var securityFillForward = fillForward;
-            if (isCanonical && symbol.SecurityType.IsOption() && symbol.SecurityType != SecurityType.FutureOption)
+            if (isCanonical)
             {
-                // option is daily only, for now exclude FOPs
+                // canonical options and futures are daily only
                 securityResolution = Resolution.Daily;
                 securityFillForward = false;
             }
@@ -1982,11 +1989,7 @@ namespace QuantConnect.Algorithm
                 if (!UniverseManager.ContainsKey(symbol))
                 {
                     var canonicalConfig = configs.First();
-                    var universeSettingsResolution = canonicalConfig.Resolution;
-                    if (symbol.SecurityType.IsOption())
-                    {
-                        universeSettingsResolution = resolution ?? UniverseSettings.Resolution;
-                    }
+                    var universeSettingsResolution = resolution ?? UniverseSettings.Resolution;
                     var settings = new UniverseSettings(universeSettingsResolution, leverage, fillForward, extendedMarketHours, UniverseSettings.MinimumTimeInUniverse)
                     {
                         Asynchronous = UniverseSettings.Asynchronous
@@ -2018,7 +2021,11 @@ namespace QuantConnect.Algorithm
                             continuousContractSymbol.ID.Symbol,
                             continuousContractSymbol.ID.SecurityType,
                             security.Exchange.Hours);
-                        AddUniverse(new ContinuousContractUniverse(security, continuousUniverseSettings, LiveMode, new SubscriptionDataConfig(canonicalConfig, symbol: continuousContractSymbol)));
+                        AddUniverse(new ContinuousContractUniverse(security, continuousUniverseSettings, LiveMode,
+                            new SubscriptionDataConfig(canonicalConfig, symbol: continuousContractSymbol,
+                                // We can use any data type here, since we are not going to use the data.
+                                // We just don't want to use the FutureUniverse type because it will force disable extended market hours
+                                objectType: typeof(Tick), extendedHours: extendedMarketHours)));
 
                         universe = new FuturesChainUniverse((Future)security, settings);
                     }
@@ -2373,7 +2380,10 @@ namespace QuantConnect.Algorithm
                     Resolution = underlyingConfigs.GetHighestResolution(),
                     ExtendedMarketHours = extendedMarketHours
                 };
-                universe = AddUniverse(new OptionContractUniverse(new SubscriptionDataConfig(configs.First(), symbol: universeSymbol), settings));
+                universe = AddUniverse(new OptionContractUniverse(new SubscriptionDataConfig(configs.First(),
+                    // We can use any data type here, since we are not going to use the data.
+                    // We just don't want to use the OptionUniverse type because it will force disable extended market hours
+                    symbol: universeSymbol, objectType: typeof(Tick), extendedHours: extendedMarketHours), settings));
             }
 
             // update the universe
@@ -2503,11 +2513,8 @@ namespace QuantConnect.Algorithm
                 Liquidate(security.Symbol);
             }
 
-            // Clear cache
-            security.Cache.Reset();
-
             // Mark security as not tradable
-            security.IsTradable = false;
+            security.Reset();
             if (symbol.IsCanonical())
             {
                 // remove underlying equity data if it's marked as internal
@@ -2555,7 +2562,6 @@ namespace QuantConnect.Algorithm
                     _pendingUserDefinedUniverseSecurityAdditions.RemoveAll(addition => addition.Security.Symbol == symbol);
                 }
             }
-
             return true;
         }
 
@@ -3327,6 +3333,7 @@ namespace QuantConnect.Algorithm
         /// <remarks>
         /// As of 2024/09/11, future options chain will not contain any additional data (e.g. daily price data, implied volatility and greeks),
         /// it will be populated with the contract symbol only. This is expected to change in the future.
+        /// As of 2024/12/18, future options data will contain daily price data but not implied volatility and greeks.
         /// </remarks>
         [DocumentationAttribute(AddingData)]
         public OptionChain OptionChain(Symbol symbol, bool flatten = false)
@@ -3351,31 +3358,101 @@ namespace QuantConnect.Algorithm
         public OptionChains OptionChains(IEnumerable<Symbol> symbols, bool flatten = false)
         {
             var canonicalSymbols = symbols.Select(GetCanonicalOptionSymbol).ToList();
-            var optionCanonicalSymbols = canonicalSymbols.Where(x => x.SecurityType != SecurityType.FutureOption);
-            var futureOptionCanonicalSymbols = canonicalSymbols.Where(x => x.SecurityType == SecurityType.FutureOption);
+            var optionChainsData = GetChainsData<OptionUniverse>(canonicalSymbols);
 
-            var optionChainsData = History(optionCanonicalSymbols, 1).GetUniverseData()
-                .Select(x => (x.Keys.Single(), x.Values.Single().Cast<OptionUniverse>()));
-
-            // TODO: For FOPs, we fall back to the option chain provider until OptionUniverse supports them
-            var futureOptionChainsData = futureOptionCanonicalSymbols.Select(symbol =>
-            {
-                var optionChainData = OptionChainProvider.GetOptionContractList(symbol, Time)
-                    .Select(contractSymbol => new OptionUniverse()
-                    {
-                        Symbol = contractSymbol,
-                        EndTime = Time.Date,
-                    });
-                return (symbol, optionChainData);
-            });
-
-            var time = Time.Date;
-            var chains = new OptionChains(time, flatten);
-            foreach (var (symbol, contracts) in optionChainsData.Concat(futureOptionChainsData))
+            var chains = new OptionChains(Time.Date, flatten);
+            foreach (var (symbol, contracts) in optionChainsData)
             {
                 var symbolProperties = SymbolPropertiesDatabase.GetSymbolProperties(symbol.ID.Market, symbol, symbol.SecurityType, AccountCurrency);
-                var optionChain = new OptionChain(symbol, time, contracts, symbolProperties, flatten);
+                var optionChain = new OptionChain(symbol, GetTimeInExchangeTimeZone(symbol).Date, contracts, symbolProperties, flatten);
                 chains.Add(symbol, optionChain);
+            }
+
+            return chains;
+        }
+
+        /// <summary>
+        /// Get the futures chain for the specified symbol at the current time (<see cref="Time"/>)
+        /// </summary>
+        /// <param name="symbol">
+        /// The symbol for which the futures chain is asked for.
+        /// It can be either the canonical future, a contract or an option symbol.
+        /// </param>
+        /// <param name="flatten">
+        /// Whether to flatten the resulting data frame. Used from Python when accessing <see cref="FuturesChain.DataFrame"/>.
+        /// See <see cref="History(PyObject, int, Resolution?, bool?, bool?, DataMappingMode?, DataNormalizationMode?, int?, bool)"/>
+        /// </param>
+        /// <returns>The futures chain</returns>
+        [DocumentationAttribute(AddingData)]
+        public FuturesChain FutureChain(Symbol symbol, bool flatten = false)
+        {
+            return FuturesChain(symbol, flatten);
+        }
+
+        /// <summary>
+        /// Get the futures chain for the specified symbol at the current time (<see cref="Time"/>)
+        /// </summary>
+        /// <param name="symbol">
+        /// The symbol for which the futures chain is asked for.
+        /// It can be either the canonical future, a contract or an option symbol.
+        /// </param>
+        /// <param name="flatten">
+        /// Whether to flatten the resulting data frame. Used from Python when accessing <see cref="FuturesChain.DataFrame"/>.
+        /// See <see cref="History(PyObject, int, Resolution?, bool?, bool?, DataMappingMode?, DataNormalizationMode?, int?, bool)"/>
+        /// </param>
+        /// <returns>The futures chain</returns>
+        [DocumentationAttribute(AddingData)]
+        public FuturesChain FuturesChain(Symbol symbol, bool flatten = false)
+        {
+            return FuturesChains(new[] { symbol }, flatten).Values.SingleOrDefault() ??
+                new FuturesChain(GetCanonicalFutureSymbol(symbol), Time.Date);
+        }
+
+        /// <summary>
+        /// Get the futures chains for the specified symbols at the current time (<see cref="Time"/>)
+        /// </summary>
+        /// <param name="symbols">
+        /// The symbols for which the futures chains are asked for.
+        /// It can be either the canonical future, a contract or an option symbol.
+        /// </param>
+        /// <param name="flatten">
+        /// Whether to flatten the resulting data frame. Used from Python when accessing <see cref="FuturesChains.DataFrame"/>.
+        /// See <see cref="History(PyObject, int, Resolution?, bool?, bool?, DataMappingMode?, DataNormalizationMode?, int?, bool)"/>
+        /// </param>
+        /// <returns>The futures chains</returns>
+        [DocumentationAttribute(AddingData)]
+        public FuturesChains FutureChains(IEnumerable<Symbol> symbols, bool flatten = false)
+        {
+            return FuturesChains(symbols, flatten);
+        }
+
+        /// <summary>
+        /// Get the futures chains for the specified symbols at the current time (<see cref="Time"/>)
+        /// </summary>
+        /// <param name="symbols">
+        /// The symbols for which the futures chains are asked for.
+        /// It can be either the canonical future, a contract or an option symbol.
+        /// </param>
+        /// <param name="flatten">
+        /// Whether to flatten the resulting data frame. Used from Python when accessing <see cref="FuturesChains.DataFrame"/>.
+        /// See <see cref="History(PyObject, int, Resolution?, bool?, bool?, DataMappingMode?, DataNormalizationMode?, int?, bool)"/>
+        /// </param>
+        /// <returns>The futures chains</returns>
+        [DocumentationAttribute(AddingData)]
+        public FuturesChains FuturesChains(IEnumerable<Symbol> symbols, bool flatten = false)
+        {
+            var canonicalSymbols = symbols.Select(GetCanonicalFutureSymbol).ToList();
+            var futureChainsData = GetChainsData<FutureUniverse>(canonicalSymbols);
+
+            var chains = new FuturesChains(Time.Date, flatten);
+
+            if (futureChainsData != null)
+            {
+                foreach (var (symbol, contracts) in futureChainsData)
+                {
+                    var chain = new FuturesChain(symbol, GetTimeInExchangeTimeZone(symbol).Date, contracts, flatten);
+                    chains.Add(symbol, chain);
+                }
             }
 
             return chains;
@@ -3526,8 +3603,8 @@ namespace QuantConnect.Algorithm
             {
                 payload["$type"] = typeName;
             }
-            return _api.BroadcastLiveCommand(Globals.OrganizationID, 
-                AlgorithmMode == AlgorithmMode.Live ? ProjectId : null, 
+            return _api.BroadcastLiveCommand(Globals.OrganizationID,
+                AlgorithmMode == AlgorithmMode.Live ? ProjectId : null,
                 payload);
         }
 
@@ -3545,6 +3622,22 @@ namespace QuantConnect.Algorithm
             }
 
             throw new ArgumentException($"The symbol {symbol} is not an option or an underlying symbol.");
+        }
+
+        private static Symbol GetCanonicalFutureSymbol(Symbol symbol)
+        {
+            // We got either a contract or the canonical itself
+            if (symbol.SecurityType == SecurityType.Future)
+            {
+                return symbol.Canonical;
+            }
+
+            if (symbol.SecurityType == SecurityType.FutureOption)
+            {
+                return symbol.Underlying.Canonical;
+            }
+
+            throw new ArgumentException($"The symbol {symbol} is neither a future nor a future option symbol.");
         }
 
         /// <summary>
@@ -3608,6 +3701,40 @@ namespace QuantConnect.Algorithm
             {
                 _statisticsService = statisticsService;
             }
+        }
+
+        /// <summary>
+        /// Makes a history request to get the option/future chain data for the specified symbols
+        /// at the current algorithm time (<see cref="Time"/>)
+        /// </summary>
+        private IEnumerable<KeyValuePair<Symbol, IEnumerable<T>>> GetChainsData<T>(IEnumerable<Symbol> canonicalSymbols)
+            where T : BaseChainUniverseData
+        {
+            foreach (var symbol in canonicalSymbols)
+            {
+                // We will add a safety measure in case the universe file for the current time is not available:
+                // we will use the latest available universe file within the last 3 trading dates.
+                // This is useful in cases like live trading when the algorithm is deployed at a time of day when
+                // the universe file is not available yet.
+                var history = (DataDictionary<T>)null;
+                var periods = 1;
+                while ((history == null || history.Count == 0) && periods <= 3)
+                {
+                    history = History<T>([symbol], periods++).FirstOrDefault();
+                }
+
+                var chain = history != null && history.Count > 0 ? history.Values.Single().Cast<T>() : Enumerable.Empty<T>();
+                yield return KeyValuePair.Create(symbol, chain);
+            }
+        }
+
+        /// <summary>
+        /// Gets the current time in the exchange time zone for the given symbol
+        /// </summary>
+        private DateTime GetTimeInExchangeTimeZone(Symbol symbol)
+        {
+            var exchange = MarketHoursDatabase.GetExchangeHours(symbol.ID.Market, symbol, symbol.SecurityType);
+            return UtcTime.ConvertFromUtc(exchange.TimeZone);
         }
     }
 }

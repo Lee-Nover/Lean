@@ -42,7 +42,7 @@ namespace QuantConnect.Util
         private static readonly HashSet<Type> _strictDailyEndTimesDataTypes = new()
         {
             // the underlying could yield auxiliary data which we don't want to change
-            typeof(TradeBar), typeof(QuoteBar), typeof(ZipEntryName), typeof(BaseDataCollection), typeof(OpenInterest)
+            typeof(TradeBar), typeof(QuoteBar), typeof(BaseDataCollection), typeof(OpenInterest)
         };
 
         /// <summary>
@@ -644,9 +644,16 @@ namespace QuantConnect.Util
 
                 case SecurityType.FutureOption:
                     path = Path.Combine(path,
-                        symbol.Underlying.Value.ToLowerInvariant(),
+                        symbol.Underlying.ID.Symbol.ToLowerInvariant(),
                         symbol.Underlying.ID.Date.ToStringInvariant(DateFormat.EightCharacter));
                     break;
+
+                case SecurityType.Future:
+                    path = Path.Combine(path, symbol.ID.Symbol.ToLowerInvariant());
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException($"Unsupported security type {symbol.SecurityType}");
             }
 
             return path;
@@ -865,7 +872,8 @@ namespace QuantConnect.Util
 
             if (tickType == null)
             {
-                if (securityType == SecurityType.Forex || securityType == SecurityType.Cfd) {
+                if (securityType == SecurityType.Forex || securityType == SecurityType.Cfd)
+                {
                     tickType = TickType.Quote;
                 }
                 else
@@ -1023,7 +1031,7 @@ namespace QuantConnect.Util
             {
                 return TickType.OpenInterest;
             }
-            if (type == typeof(ZipEntryName))
+            if (type.IsAssignableTo(typeof(BaseChainUniverseData)))
             {
                 return TickType.Quote;
             }
@@ -1564,17 +1572,8 @@ namespace QuantConnect.Util
                 return false;
             }
 
-            var isZipEntryName = dataType == typeof(ZipEntryName);
-            if (isZipEntryName && baseData.Time.Hour == 0)
-            {
-                // zip entry names are emitted point in time for a date, see BaseDataSubscriptionEnumeratorFactory. When setting the strict end times
-                // we will move it to the previous day daily times, because daily market data on disk end time is midnight next day, so here we add 1 day
-                baseData.Time += Time.OneDay;
-                baseData.EndTime += Time.OneDay;
-            }
-
             var dailyCalendar = GetDailyCalendar(baseData.EndTime, exchange, extendedMarketHours: false);
-            if (!isZipEntryName && dailyCalendar.End < baseData.Time)
+            if (dailyCalendar.End < baseData.Time)
             {
                 // this data point we were given is probably from extended market hours which we don't support for daily backtesting data
                 return false;
@@ -1591,24 +1590,34 @@ namespace QuantConnect.Util
         /// <param name="fileName">File name extracted</param>
         /// <param name="entryName">Entry name extracted</param>
         public static void ParseKey(string key, out string fileName, out string entryName)
-         {
-             // Default scenario, no entryName included in key
-             entryName = null; // default to all entries
-             fileName = key;
+        {
+            // Default scenario, no entryName included in key
+            entryName = null; // default to all entries
+            fileName = key;
 
-             if (key == null)
-             {
-                 return;
-             }
+            if (key == null)
+            {
+                return;
+            }
 
-             // Try extracting an entry name; Anything after a # sign
-             var hashIndex = key.LastIndexOf("#", StringComparison.Ordinal);
-             if (hashIndex != -1)
-             {
-                 entryName = key.Substring(hashIndex + 1);
-                 fileName = key.Substring(0, hashIndex);
-             }
-         }
+            // Try extracting an entry name; Anything after a # sign
+            var hashIndex = key.LastIndexOf("#", StringComparison.Ordinal);
+            if (hashIndex != -1)
+            {
+                entryName = key.Substring(hashIndex + 1);
+                fileName = key.Substring(0, hashIndex);
+            }
+        }
+
+        /// <summary>
+        /// Helper method to determine if the specified data type supports extended market hours
+        /// </summary>
+        /// <param name="dataType">The data type</param>
+        /// <returns>Whether the specified data type supports extended market hours</returns>
+        public static bool SupportsExtendedMarketHours(Type dataType)
+        {
+            return !dataType.IsAssignableTo(typeof(BaseChainUniverseData));
+        }
 
         /// <summary>
         /// Helper method to aggregate ticks or bars into lower frequency resolutions
